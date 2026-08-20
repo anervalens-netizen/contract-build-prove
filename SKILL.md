@@ -1,210 +1,168 @@
 ---
 name: contract-build-prove
-description: Orchestrate substantial repository work through execution subagents, a falsifiable acceptance contract, restartable planning, independent verifier subagents, and evidence-backed completion. Use for multi-session, multi-component, migration, deployment, difficult bugfix, or high-risk work. Supports Codex, DeepSeek Harness, and compatible subagent-capable harnesses. Do not use for trivial local low-risk edits.
+description: Orchestrate substantial repository work with mandatory builder and verifier subagents, a frozen acceptance contract, exact-candidate verification, and restartable evidence. Use for multi-session, multi-component, migration, deployment, difficult debugging, or high-risk work in Codex, DeepSeek Harness, and compatible subagent harnesses. Do not use for trivial local edits.
 ---
 
 # Contract-Build-Prove
 
-Make substantial repository work hard to falsely declare complete.
+Make false completion difficult without making process the main job.
 
-The primary agent is the **coordinator**. It owns intent, contract, decomposition, orchestration, integration, candidate identity, and final state. It does **not** act as the default implementation worker or acceptance authority.
+**Coordinator → preflight/investigate → freeze contract → builder → integrate/freeze candidate → fresh verifier → remediate or close**
 
-Core flow:
+If this skill is active, subagents are mandatory. Standard CBP normally means **one builder + one final verifier**. Add agents only for genuinely independent work or a specific high-risk reason.
 
-**Understand → Contract → Delegate builders → Integrate → Freeze candidate → Fresh verifier → Remediate or close**
+`SKILL.md` is normative. Files under `references/` operationalize these rules and must not redefine them.
 
-If this skill is active, subagent orchestration is mandatory. A normal CBP run requires at least one execution/builder subagent and one separate verifier subagent. Small local low-risk work should not invoke this skill.
+## Non-negotiable invariants
 
-Map roles and preferred models to the active harness using `references/RUNTIMES.md`.
+1. **Coordinator orchestrates.** Meaningful behavioral implementation goes to builder subagents. The coordinator may resolve mechanical merge conflicts and make trivial integration-only edits; behavioral changes return to a builder.
+2. **Builder cannot accept itself.** Builder checks are evidence inputs only.
+3. **Verifier is fresh.** Every verification attempt uses a new child context that did not implement that candidate.
+4. **Contract freezes before implementation.** Read-only investigation may happen first; freeze before the first tracked repository edit or implementation-builder launch.
+5. **Verifier proves the exact candidate.** It independently attests candidate identity before and after verification. Identity mismatch is `BLOCKED`, never `PASS`.
+6. **Protect existing work.** Never overwrite user/newer/unrelated changes.
+7. **External side effects require authorization.** No push, merge, deploy, production mutation, destructive migration, deletion, or irreversible external action unless explicitly authorized by the user or repository policy.
 
-## Core invariants
+## 0. Runtime preflight — before edits
 
-1. **Coordinator orchestrates; subagents execute.** Delegate meaningful implementation to builder subagents. The coordinator may make only small integration glue, conflict-resolution, or orchestration edits that are impractical to delegate.
-2. **Builders never accept themselves.** A builder may test its own work, but it cannot authorize acceptance criteria `PASS`.
-3. **Verification is fresh and independent.** The verifier must run in a fresh child context that did not implement the candidate. Use the runtime's verifier routing; GPT-5.6 Luna is the preferred verifier in Codex and the required verifier in the intended DSH setup.
-4. **Protect existing work.** Never overwrite user changes, newer work, or unrelated edits.
-5. **Freeze success before building.** Once implementation starts, never silently weaken, remove, or reinterpret an acceptance criterion.
-6. **Verify an exact candidate.** Tie acceptance to an exact commit SHA or deterministic workspace fingerprint. Any verified-source change invalidates the previous verdict.
-7. **Prove behavior, not edits.** Prefer executable tests and real runtime observations over claims that code "looks correct."
-8. **Respect side-effect boundaries.** Do not push, merge, deploy, mutate production data/schema, delete resources, or perform irreversible external actions unless the user or repository policy explicitly authorizes them.
+Read `references/RUNTIMES.md` and establish:
 
-## 1. Choose rigor: Standard or High Assurance
+- harness/runtime;
+- actual builder route/model;
+- actual verifier route/model;
+- fresh-context support;
+- artifact/workspace mode: `SHARED_WORKSPACE` or `ISOLATED_ARTIFACT`;
+- repository access needed by both roles.
 
-### Standard CBP — default
-Use for substantial, multi-component, multi-session, difficult-to-verify, or restartable work.
+Do not assume a prompt can select a model the harness did not route. In the intended DSH setup, the verifier route must resolve to **GPT-5.6 Luna**. If required routing/freshness cannot be confirmed, report `BLOCKED` **before implementation**.
 
-Require:
-- one coordinator;
-- one canonical ExecPlan;
-- frozen acceptance criteria;
-- one or more bounded builder subagents;
-- integrated candidate identity;
-- one fresh final verifier subagent for the integrated candidate.
+For Codex, prefer GPT-5.6 Luna for builders when suitable and especially for final verification; a documented fallback is allowed by `references/RUNTIMES.md`.
 
-### High Assurance
-Use for security, auth/identity, financial/trading logic, destructive migrations, sensitive production data, safety-critical behavior, or unusually costly failure.
+## 1. Understand and investigate
 
-Add:
-- fresh pre-build critique of critical acceptance criteria;
-- negative/boundary/adversarial checks where applicable;
-- intermediate independent verification at critical boundaries only when it materially reduces risk;
-- fresh final verification of the fully integrated candidate.
+Establish only the baseline needed to work safely:
 
-If uncertain, choose High Assurance for irreversible or high-impact failure; otherwise Standard.
+- applicable repository instructions;
+- branch and exact HEAD;
+- working-tree/user/newer changes to protect;
+- relevant runtime/external state when the objective depends on it.
 
-## 2. Establish baseline and plan
+For unknown-root-cause debugging, use read-only exploration before committing to an implementation hypothesis. Explorer/diagnostic subagents are allowed and do not count as the mandatory implementation builder.
 
-Before editing:
+Read-only investigation may inspect files, logs, history, tests, and runtime observations. A new regression test, diagnostic instrumentation committed to the repository, or any other tracked edit requires the contract to be frozen first.
 
-- Read applicable repository instructions, architecture, runbooks, and any existing plan for the same objective.
-- Record branch, exact HEAD, working-tree state, relevant recent history, and protected user/newer work.
-- Record relevant runtime/deployed SHA, schema, service health, or external state when the task depends on it. Inaccessible state is `UNVERIFIED`.
-- Reuse one existing canonical plan for the objective. Do not create a competing tracker.
-- If no equivalent plan system exists, create an ExecPlan using `assets/EXEC_PLAN_TEMPLATE.md`. Read `references/PLANS.md` when creating, resuming, or repairing a plan.
+Create or reuse one small durable plan using `assets/EXEC_PLAN_TEMPLATE.md`; read `references/PLANS.md`. If the repository already has an equivalent canonical plan system, reuse it instead of creating another tracker.
 
-Before integration and before final verification, recheck HEAD and working tree. If drift overlaps owned scope, re-evaluate the candidate and contract before continuing. Never overwrite newer/user work.
+## 2. Define and freeze success
 
-## 3. Write and freeze the acceptance contract
+Write falsifiable acceptance criteria that state:
 
-For each criterion define:
-
-- observable behavior;
+- observable required behavior;
 - protected behavior/non-goals;
-- verification method and expected result;
-- runtime/API/browser/database/deploy proof when relevant;
-- evidence required for `PASS`.
+- verification method and expected result.
 
-Criteria must be falsifiable. Start them as `UNVERIFIED`.
+For bug fixes, reproduce the failure before the fix when reasonably possible. If reproduction is impossible, record why.
 
-For bug fixes, reproduce the failure before the fix when reasonably possible, then prove the same observation passes after the fix. If pre-fix reproduction is impossible, record why.
+**Freeze the contract immediately before the first tracked implementation/test edit or implementation-builder launch.**
 
-For High Assurance, require at least one useful negative, boundary, or adversarial check for each critical criterion where applicable.
+After freeze, any criterion change records `OLD / NEW / REASON / IMPACT`. Explicit user authorization is required to weaken the observable outcome, protected behavior, **or required evidence strength**. Never redefine success to escape a blocker.
 
-**Contract freeze:** the contract freezes when the first implementation edit begins. Later changes require an explicit amendment recording `OLD`, `NEW`, `REASON`, and `IMPACT`. Never reduce the requested user outcome without explicit user authorization. If a blocker forces reduced scope, report `PARTIAL` or `BLOCKED`; do not redefine success.
+High Assurance is reserved for security/auth boundaries, financial/trading logic, destructive/stateful migrations, sensitive production data, safety-critical behavior, or unusually costly failure. It may add a fresh contract critique and at most one critical-boundary verification when a named failure mode justifies it. Do not add verification ceremony by default.
 
-For High Assurance, launch a fresh verifier subagent to critique the draft contract before building. It critiques testability and missing failure cases; it does not implement.
+## 3. Delegate the build
 
-## 4. Decompose and launch builder subagents
+Use `references/BUILDER_HANDOFF.md`.
 
-The coordinator converts the contract into the smallest useful independent work packets and launches subagents to execute them.
+Default rules:
 
-Each builder handoff must contain enough standalone context to execute without the parent conversation:
+- **one builder writer at a time**;
+- one builder owns a tightly coupled change set end to end;
+- parallelize investigation/testing freely;
+- parallelize writers only when isolated by worktree/branch/artifact, or when explicit non-overlapping ownership plus integration controls make collisions genuinely unlikely;
+- in a shared workspace, never run multiple write-capable builders concurrently;
+- for debugging, scope by owned outcome + likely area + exclusions rather than pretending the exact files are already known.
 
-- task objective and owned scope;
-- relevant acceptance criteria;
-- files/components it may change;
-- protected behavior and explicit non-goals;
-- expected verification;
-- side-effect/authorization limits;
-- required return format: changes, checks run, results, blockers, remaining risk.
+Artifact transport is explicit:
 
-Use `references/BUILDER_HANDOFF.md` when useful.
+- `SHARED_WORKSPACE`: builder edits the coordinator-visible workspace; coordinator inspects the actual diff.
+- `ISOLATED_ARTIFACT`: builder returns an exact commit/patch/artifact; coordinator must integrate it before candidate freeze.
 
-Rules:
+A builder may self-test but may not mark acceptance criteria `PASS`.
 
-- **At least one builder subagent is mandatory for every CBP run.**
-- Start with the smallest useful team, normally 1–3 builders. Add more only when the work decomposes into clearly independent scopes and coordination overhead remains low.
-- Parallelize only work that does not contend for the same files, state, or sequencing.
-- Keep tightly coupled architecture, database, auth, state-management, financial/trading, and cross-layer invariants under one sequential builder owner unless independence is clear.
-- A builder may inspect and test its own work, but may not declare acceptance criteria independently `PASS`.
-- The coordinator integrates builder outputs, resolves conflicts, updates the plan, and owns candidate identity.
-- Use the current harness's normal file-editing and execution tools; do not require a specific vendor tool name.
-- Make the smallest defensible change. Preserve unrelated behavior.
+## 4. Integrate and freeze the candidate
 
-After two materially similar attempts without measurable progress, record the cause, replan once, and launch a meaningfully different builder approach. If that also stalls or essential access is unavailable, mark the affected work `BLOCKED` and state the exact unblock condition.
+The coordinator must:
 
-## 5. Integrate, verify locally, and freeze the candidate
+1. confirm every builder artifact is actually present in the integrated workspace;
+2. inspect the real integrated diff/status, not only builder summaries;
+3. run relevant narrow/regression checks;
+4. confirm protected user/newer work remains intact;
+5. create the exact candidate identity described in `references/PLANS.md`;
+6. freeze that candidate for final verification.
 
-The coordinator:
+Prefer an exact local commit SHA. If the candidate must remain uncommitted, use the canonical tracked-patch + untracked-manifest fingerprint from `references/PLANS.md`.
 
-1. collects builder results;
-2. inspects the integrated diff/status rather than trusting summaries;
-3. runs or delegates narrow checks first, then relevant regression gates;
-4. rechecks drift and protected work;
-5. records candidate identity:
-   - prefer an exact commit SHA when repository policy permits commits;
-   - otherwise record exact HEAD plus a deterministic fingerprint of relevant workspace changes;
-6. freezes the candidate for independent verification.
+The ExecPlan/control-state file is **not verified source** and must be declared as control metadata. Do not commit or mutate verified source after freeze. Source/config/test changes create a new candidate; control-state-only updates do not, provided the verifier independently confirms that distinction.
 
-Builder/local checks are useful evidence but do not authorize acceptance.
+## 5. Prove with one fresh verifier
 
-Do not change verified source after candidate freeze. Any source change creates a new candidate and requires affected verification again.
+Use `references/VERIFIER_HANDOFF.md`.
 
-## 6. Launch the independent verifier subagent
+The verifier must, in order:
 
-A fresh verifier subagent is mandatory for every CBP run.
+1. independently attest that the workspace/artifact matches the expected candidate identity;
+2. inspect/test the actual candidate against every required criterion;
+3. independently attest candidate identity again after verification;
+4. return `PASS`, `FAIL`, or `BLOCKED` with reproducible evidence.
 
-Runtime-specific model/provider routing is defined in `references/RUNTIMES.md`.
+Candidate identity mismatch before or after tests is `BLOCKED: CANDIDATE_IDENTITY_MISMATCH`.
 
-The verifier must:
+The verifier receives the objective, frozen contract/amendments, protected behavior, candidate identity, runtime target, and access constraints. Do **not** give builder confidence, a defense of the implementation, or a desired verdict.
 
-- run in a fresh context;
-- have taken no implementation role in the candidate;
-- receive the objective, frozen contract/amendments, relevant baseline, exact candidate identity, verification targets, and access limits;
-- inspect the real integrated artifact;
-- reconstruct whether the contract is satisfied from evidence.
+Verifier execution may use an isolated writable snapshot when tests require caches/build output/temp databases. Tracked candidate source must remain unchanged; production mutation is forbidden during verification unless a separately authorized verification step explicitly requires it.
 
-Do **not** provide builder confidence, a defense of the implementation, or the desired verdict.
+## 6. Remediate without looping forever
 
-Default verification pattern:
+On `FAIL`:
 
-- **Standard:** one fresh final verifier checks the fully integrated candidate and may authorize multiple criteria in one pass.
-- **High Assurance:** optional fresh verifier(s) at critical milestones, plus a fresh final verifier for the integrated candidate.
-
-Do not automatically create one verifier per builder task; intermediate verification is selective, not ceremonial.
-
-Use `references/VERIFIER_HANDOFF.md` for the verifier contract.
-
-Prefer read-only tracked source for verification. Temporary test/cache writes are acceptable only in an isolated or disposable location when needed. Never let verification mutate production state.
-
-Require exactly:
-
-```text
-VERDICT: PASS | FAIL | BLOCKED
-CONTRACT: criterion -> PASS | FAIL | BLOCKED, with reason
-EVIDENCE: exact commands/probes, results, paths/URLs, candidate SHA/fingerprint
-FINDINGS: concrete defects/regressions, highest severity first
-UNVERIFIED: anything not actually observed
-LARGEST_GAP: single next remediation target, or NONE
-```
-
-The coordinator records the verdict; the verifier does not edit the canonical plan.
-
-If the required builder or verifier subagent capability is unavailable, do not silently collapse the workflow into a single-agent run. Report `BLOCKED` for CBP execution and state the missing capability.
-
-## 7. Remediate and close
-
-On verifier `FAIL`:
-
-- return affected work to building;
-- launch an appropriate builder for the highest-impact demonstrated gap;
-- integrate the remediation;
+- target the largest demonstrated gap;
+- launch an appropriate builder;
+- integrate the fix;
 - create a new candidate identity;
-- rerun affected local verification;
-- launch a fresh verification pass on the new candidate.
+- launch a **new fresh verifier child**.
 
-Mark overall `DONE` only when:
+Normal debugging failures are not automatically stagnation. Progress means the failed acceptance surface, severity, or causal uncertainty is measurably shrinking.
 
-- every required acceptance criterion is independently `PASS` for the current candidate;
-- relevant regression gates pass;
-- required runtime/deployment proof exists;
-- no unresolved protected-work or drift conflict remains.
+Global circuit breaker:
 
-Otherwise report exactly `PARTIAL` or `BLOCKED`, with completed work, failed/unverified criteria, evidence, candidate identity, risks, and the next concrete action.
+- after **3 final-verifier FAILs**, or **2 full cycles with no reduction in failed criteria/severity**, stop normal remediation and perform one fresh root-cause replan/investigation;
+- if one further cycle still does not improve the failed surface, report `PARTIAL` or `BLOCKED` instead of continuing indefinitely.
 
-When deployment is explicitly in scope and authorized, verify the exact deployed SHA/digest plus health and the real user-facing flow. No production access means production verification remains `UNVERIFIED`.
+`PARTIAL` means useful requested work is proven but not every criterion can be completed within the current authorized scope. `BLOCKED` means there is no safe next action without missing capability, access, decision, or recovery work.
 
-## Evidence hygiene
+## 7. High-Assurance external/stateful work
 
-Record concise, reproducible evidence. Prefer command/probe + result + candidate identity + environment/timestamp when relevant. Store durable sanitized artifacts only when useful.
+If the task mutates database/schema/auth state, deployed infrastructure, queues, external resources, or other persistent state, read `references/STATEFUL.md` before mutation.
 
-Never store secrets, credentials, private keys, personal data, sensitive production payloads, or unnecessary raw database/log content in plans, evidence, Git, or chat.
+Source SHA alone is not enough. Record source + environment + external-state/deployed identity. If an authorized irreversible/stateful action fails, do **not** enter the generic remediation loop immediately: enter recovery, re-baseline the actual external state, then choose rollback or explicit forward recovery before more mutation.
 
-## Supporting references
+## DONE rule
 
-- `references/RUNTIMES.md` — Codex, DeepSeek Harness, model/provider, and role mapping.
-- `references/PLANS.md` — ExecPlan lifecycle, state mapping, evidence rules, resume procedure.
-- `references/BUILDER_HANDOFF.md` — standalone implementation-subagent contract.
-- `references/VERIFIER_HANDOFF.md` — fresh verifier handoff and independence rules.
-- `references/EXAMPLE.md` — minimal builder → FAIL → remediation → PASS example.
-- `references/verifier.example.toml` — optional Codex custom verifier configuration.
+Declare `DONE` only when:
+
+- every required acceptance criterion is `PASS` for the current attested candidate;
+- relevant regression/runtime proof passes;
+- protected work is intact;
+- no required stateful recovery remains.
+
+Otherwise report `PARTIAL` or `BLOCKED` with the exact failed/unverified criteria and next safe action.
+
+## References
+
+- `references/RUNTIMES.md` — runtime preflight, DSH/Codex routing, workspace/artifact modes.
+- `references/PLANS.md` — lean durable state, candidate identity, resume rules.
+- `references/BUILDER_HANDOFF.md` — builder contract.
+- `references/VERIFIER_HANDOFF.md` — candidate attestation + final proof contract.
+- `references/STATEFUL.md` — external-state identity and recovery gate for High Assurance.
+- `references/EXAMPLE.md` — minimal end-to-end example.
+- `references/verifier.example.toml` — optional Codex Luna verifier example.
