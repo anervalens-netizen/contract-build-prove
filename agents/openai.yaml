@@ -1,7 +1,7 @@
 interface:
   display_name: "Contract–Build–Prove"
   short_description: "Orchestrate builders, verify independently, prove completion"
-  default_prompt: "Use $contract-build-prove as the coordinator. Do not implement the substantial task monolithically: launch bounded builder subagents, integrate their work, freeze the acceptance contract and exact candidate, then launch a fresh independent verifier subagent before declaring completion. Prefer GPT-5.6 Luna for subagents when suitable and especially for final verification."
+  default_prompt: "Use $contract-build-prove as the coordinator. Define and freeze a falsifiable acceptance contract first; then launch bounded builder subagents instead of implementing the substantial task monolithically, integrate their work, freeze the exact candidate, and launch a fresh independent verifier before declaring completion. Prefer GPT-5.6 Luna for Codex subagents when suitable and especially for final verification."
 
 policy:
   allow_implicit_invocation: true
