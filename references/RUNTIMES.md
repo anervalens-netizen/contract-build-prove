@@ -19,10 +19,10 @@ The coordinator may perform small integration glue or conflict resolution, but s
 
 ## Model routing principles
 
-- **Verification quality has priority over cost.** Prefer GPT-5.6 Luna for the independent verifier whenever available.
+- Verification quality has priority over cost.
 - Builder model choice may optimize for coding fit, speed, context, and cost, provided the coordinator preserves the contract and independent-verification boundary.
-- A verifier should not be the same child session/context as any builder. Freshness matters even if the same underlying model family is used.
-- If the preferred model is unavailable, use the strongest available independent verifier and record the deviation in the ExecPlan.
+- A verifier must not be the same child session/context as any builder. Freshness matters even if the same model family is used.
+- Runtime-specific routing below overrides generic preferences.
 
 ## OpenAI Codex
 
@@ -32,25 +32,27 @@ The current Codex agent/thread running this skill.
 ### Builders
 The coordinator chooses builder subagent model/role according to task complexity and specialization.
 
-Preference order:
+Preference:
 
 1. **GPT-5.6 Luna** when available and suitable;
-2. another strong coding-capable subagent selected by the coordinator when it has a clear advantage for the specific task;
-3. project-specific custom builder when repository policy/configuration defines one.
+2. another strong coding-capable subagent when the coordinator has a concrete reason to prefer it for that task;
+3. a project-specific custom builder when repository configuration defines one.
 
 Use `explorer` only for read-heavy discovery. Exploration does not replace the mandatory implementation builder.
 
 ### Verifier
-Prefer **GPT-5.6 Luna** as the final verifier.
+Prefer **GPT-5.6 Luna** for final verification.
 
 Role selection when supported:
 
-1. fresh configured `auditor` using GPT-5.6 Luna;
+1. fresh configured `verifier` using GPT-5.6 Luna;
 2. fresh configured `reviewer` using GPT-5.6 Luna;
-3. fresh general-purpose/default subagent using GPT-5.6 Luna and `AUDITOR_HANDOFF.md`;
-4. if Luna is unavailable, the strongest available fresh independent verifier, with the deviation recorded.
+3. fresh general-purpose/default subagent using GPT-5.6 Luna and `VERIFIER_HANDOFF.md`;
+4. if Luna is unavailable, the strongest available fresh independent verifier, with the deviation recorded in the ExecPlan.
 
 Never reuse a builder session as verifier for the candidate it implemented.
+
+For High Assurance, the coordinator may raise reasoning effort or choose a stronger verifier if the runtime policy permits it and the risk justifies the cost.
 
 ### Skill location
 
@@ -66,24 +68,24 @@ Never reuse a builder session as verifier for the candidate it implemented.
 The current DSH agent/session running the skill. It owns the ExecPlan, contract, decomposition, orchestration, integration, candidate freeze, and final state.
 
 ### Builders
-Use DSH's configured **execution subagent** for implementation work. The harness/project configuration owns the concrete provider and model selection; CBP should not override that routing.
+Use DSH's configured **execution subagent** for implementation work.
 
-In the intended setup this execution role is backed by **MiniMax**, but the skill refers to the configured execution role rather than hardcoding a specific MiniMax model/version. This lets DSH evolve its provider/model configuration without requiring changes to the workflow.
+The DSH/project configuration owns the concrete provider and model. In the intended setup this role is backed by **MiniMax**; CBP deliberately does not hardcode the MiniMax model/version because the harness already knows the configured execution route.
 
-Each builder invocation must be a scoped child context with a standalone handoff. Use `BUILDER_HANDOFF.md`.
+Each builder invocation must be a scoped child context with a standalone handoff from `BUILDER_HANDOFF.md`.
 
 ### Verifier
-Use a **new GPT-5.6 Luna subagent** for independent verification.
+Use a **new GPT-5.6 Luna subagent** for independent verification. In the intended DSH setup this routing is mandatory, not merely preferred.
 
 Required properties:
 
-- provider/model route resolves to GPT-5.6 Luna through the DSH configuration;
+- DSH provider/model routing resolves the verifier to `gpt-5.6-luna`;
 - invocation is fresh and did not participate in implementation;
-- verifier receives `AUDITOR_HANDOFF.md`, the frozen contract, and exact candidate identity;
+- verifier receives `VERIFIER_HANDOFF.md`, the frozen contract, and exact candidate identity;
 - it directly inspects/tests the integrated candidate;
-- it does not inherit or receive the builder's confidence or desired verdict.
+- it does not receive the builder's confidence or desired verdict.
 
-If GPT-5.6 Luna is temporarily unavailable, use the strongest available fresh independent verifier only if the coordinator records the deviation explicitly. If no independent verifier exists, report `BLOCKED`.
+If the configured GPT-5.6 Luna verifier route is unavailable, report the verification phase `BLOCKED` rather than silently substituting another DSH model/provider.
 
 ### Skill location
 
@@ -93,7 +95,7 @@ DSH can discover project skills from:
 .agents/skills/contract-build-prove/
 ```
 
-No DSH-specific metadata file is required by the portable core. Provider/model routing should remain in DSH's own configuration rather than being duplicated inside this skill.
+No DSH-specific metadata file is required by the portable core. Provider/model routing remains in DSH's own configuration rather than being duplicated inside this skill.
 
 ## Generic subagent-capable harness
 
