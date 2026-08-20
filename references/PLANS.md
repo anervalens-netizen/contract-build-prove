@@ -1,172 +1,121 @@
 # Lean ExecPlan reference
 
-The ExecPlan exists only so another coordinator session can resume without reconstructing the conversation. It is **control state**, not the software candidate.
+The ExecPlan exists only so another coordinator can resume safely. It is **control state**, not software candidate. `SKILL.md` is normative.
 
-`SKILL.md` is normative.
+Reuse an equivalent repository-native plan when one already exists. Otherwise use `assets/EXEC_PLAN_TEMPLATE.md`, normally `.cbp/PLAN.md` or another path guaranteed visible to the next expected coordinator session.
 
-If the repository already has one canonical planning system for the same objective, reuse it. Otherwise use `assets/EXEC_PLAN_TEMPLATE.md`, normally as `.cbp/PLAN.md` or another repository-approved control-state path.
-
-The plan location must be guaranteed visible to the **next coordinator session expected for this workstream**. Do not call an ephemeral filesystem path durable.
-
-## Minimal state
+## Minimal durable state
 
 Keep only:
-
-- protocol + overall status;
+- protocol version + overall status;
 - goal / protected behavior;
-- active runtime profile;
+- runtime profile;
 - frozen acceptance contract;
-- current workstreams;
+- workstreams;
 - current candidate/state target;
 - last verifier result;
 - next safe action.
 
-State vocabularies:
+States:
 
 | Layer | States |
 |---|---|
 | Workstream | `READY`, `BUILDING`, `BUILT`, `BLOCKED` |
-| Acceptance criterion | `UNVERIFIED`, `PASS`, `FAIL`, `BLOCKED` |
+| Criterion | `UNVERIFIED`, `PASS`, `FAIL`, `BLOCKED` |
 | Overall | `ACTIVE`, `DONE`, `PARTIAL`, `BLOCKED` |
 
-The verifier reports `PASS | FAIL | BLOCKED`; that is a result, not another lifecycle state machine.
+Update only after preflight, at contract freeze, after authorized amendment, after a material failure/discovery, at candidate freeze, after final verification, and before interruption/handoff. No progress diary.
 
-## Update cadence
+## Contract
 
-Update the plan only:
+Freeze required/protected behavior before the first candidate-affecting edit or builder launch.
 
-- after runtime preflight;
-- **at contract freeze**;
-- after an authorized contract amendment;
-- after a meaningful failure/discovery that changes the next action;
-- at candidate freeze;
-- after final verification;
-- before interruption/handoff.
+Do not weaken what must be proven. A proof method may change without amendment only when it remains at least as convincing and the frozen requirement is unchanged.
 
-Do not maintain a chronological diary. Do not paste large logs.
-
-## Control state versus candidate source
-
-Declare control-state paths explicitly.
-
-Control-state changes do **not** change candidate identity. Source, tests, configuration, migrations, generated source, permissions/modes, or other behavior-affecting repository changes do.
-
-Prefer not to commit control-state updates after candidate freeze. If plan files are tracked, final reporting must still name the exact verified source candidate rather than implying a later metadata-only commit was verified.
-
-## Contract lifecycle
-
-1. Investigation may occur while behavior is draft.
-2. Freeze required behavior, protected behavior, and evidence strength before the first candidate-affecting tracked edit or implementation-builder launch.
-3. After freeze, weakening any frozen requirement uses `OLD / NEW / REASON / IMPACT / AUTHORIZATION`.
-4. The verification technique may be refined without amendment only when equivalent or stronger and the frozen requirement is unchanged.
+Scope weakening uses `OLD / NEW / REASON / IMPACT / AUTHORIZATION`.
 
 ## Candidate identity
 
-### Normal path: exact local commit
+### Default: commit candidate
 
-Use an exact local commit SHA whenever local commits are permitted.
+Use an exact local commit SHA whenever permitted.
 
-The verifier must attest the **artifact it tests**. For a commit-backed writable worktree/snapshot, resolve that snapshot to the expected commit before testing and confirm it still represents the same candidate afterward.
+**Default final-verifier path:** materialize a clean isolated worktree/snapshot from that exact SHA, attest it, test it, then re-attest it.
+
+Testing a non-clean/current workspace instead is allowed only after proving candidate-affecting tracked/untracked state matches the SHA except declared control metadata.
+
+If unrelated protected user/newer changes exist, they must not become an implicit dependency. Either isolate CBP-owned candidate work, explicitly record the pre-existing change as an authorized baseline dependency, or block. Never exclude protected source merely to make identity match.
 
 ### Fallback: uncommitted candidate
 
-Do **not** implement hashing rules manually.
-
-Use the bundled helper from the skill directory:
+Use the bundled helper only:
 
 ```text
 python3 <skill-root>/scripts/candidate_id.py create --exclude .cbp/PLAN.md
+python3 <skill-root>/scripts/candidate_id.py verify <expected-cbp2-id> --exclude .cbp/PLAN.md
 ```
 
-It returns a deterministic `cbp1:<sha256>` identity plus diagnostic components. It covers:
+Add `--exclude` once per literal control-state path.
 
-- exact base HEAD;
-- binary tracked diff, including tracked mode changes;
-- every non-ignored untracked path;
-- Git-relevant regular-file executable mode;
-- symlink identity/target content;
-- declared control-state exclusions.
+Exit codes:
+- `0` = create success / verify match;
+- `2` = identity mismatch;
+- `3` = `UNSUPPORTED_WORKTREE_STATE`.
 
-Add `--exclude` once per control-state path.
-
-Verifier check:
-
-```text
-python3 <skill-root>/scripts/candidate_id.py verify <expected-cbp1-id> --exclude .cbp/PLAN.md
-```
-
-Exit `0` means match; exit `2` means identity mismatch.
-
-If neither a commit candidate nor the bundled helper can be used reliably, exact uncommitted verification is unavailable; do not invent an ad-hoc fingerprint.
-
-## Artifact identity rule
+The helper intentionally fails closed on Git states it cannot identify exactly, including unresolved conflicts, hidden index states, problematic file-mode configuration, dirty/unavailable submodules, and unsupported untracked types. When exit `3` occurs, use a commit/isolated artifact or report `BLOCKED`; do not invent another fingerprint.
 
 **The attested artifact must be the tested artifact.**
 
-If verification uses an isolated writable copy, materialize the candidate into that copy and attest the copy itself before tests. Re-attest the same copy afterward. The parent workspace is not a proxy for a different tested snapshot.
+## Control state vs source
 
-## Workspace mode
+Control-state changes do not change candidate identity. Source, tests, config, migrations, generated source, permissions/modes, and other behavior-affecting changes do.
 
-Record one:
+Prefer not to commit control-state updates after candidate freeze. Final reporting always names the exact verified source/state candidate.
 
-- `SHARED_WORKSPACE` — builder edits the coordinator-visible workspace.
-- `ISOLATED_ARTIFACT` — builder works elsewhere and returns an exact integratable artifact.
+## Workspace + drift
 
-In shared workspace, one write-capable child at a time. At candidate freeze, no write-capable shared child may remain active.
+Record `SHARED_WORKSPACE` or `ISOLATED_ARTIFACT`.
+
+In shared workspace:
+- one writer total;
+- coordinator compares actual state around each writer packet;
+- unexpected overlapping user/process drift must be reconciled before continuing;
+- no writer remains active at candidate freeze.
+
+Prefer isolated artifacts when concurrent human/process edits are likely.
 
 ## Test ownership
 
 - Builder: focused development checks.
-- Coordinator: only integration-specific checks when integration creates a real risk; avoid ritual reruns.
+- Coordinator: integration-specific checks only when integration creates real risk.
 - Verifier: acceptance/regression authority.
 
-Trusted immutable CI evidence tied to the exact attested candidate may be independently inspected instead of rerunning an expensive gate when it fully proves the required criterion.
-
-## Evidence
-
-Keep evidence next to the criterion or in the last-verifier block. Enough means:
-
-- exact command/probe or immutable CI/runtime evidence;
-- concise result;
-- candidate/state identity;
-- environment when relevant.
-
-No separate evidence index.
+Immutable CI/runtime evidence tied to the exact candidate may replace an expensive rerun when it fully proves the criterion.
 
 ## Progress control
 
-Progress means at least one of these materially improves:
+Progress means failed surface/severity or causal uncertainty materially shrinks, or new discriminating evidence appears.
 
-- failed acceptance surface;
-- failure severity;
-- causal uncertainty/fault-domain size;
-- discriminating evidence.
+Two consecutive investigation/remediation cycles with no such progress → one fresh synthesis/replan. One further non-improving cycle → `PARTIAL` or `BLOCKED`.
 
-For investigation: two consecutive cycles with no information gain require a fresh synthesis/replan before another hypothesis.
-
-For remediation: if the same failed surface/blocker survives two consecutive cycles without material improvement or new discriminating evidence, perform one fresh root-cause synthesis/replan. One further non-improving cycle ends `PARTIAL` or `BLOCKED`.
-
-Do not trigger replanning merely because several verifier attempts failed while the system is clearly converging.
-
-## Resume
+## Resume + protocol version
 
 The plan must contain:
 
 ```text
 PROTOCOL=contract-build-prove
-PROTOCOL_STATE=ACTIVE
+PROTOCOL_VERSION=5
 ```
 
-On session resume/context reconstruction, **reload the active CBP skill before acting**, then re-read this plan and check current repository/runtime state against it.
+On resume/context reconstruction, reload the active CBP skill before acting.
 
-A fresh coordinator should be able to answer:
+If plan `PROTOCOL_VERSION` differs from the current skill version, revalidate runtime profile, frozen contract, candidate/state identity, and next action once before continuing; record the migration. Do not silently apply changed semantics to old state.
 
-1. What result is required and what must not change?
-2. Which builder/verifier routes, verifier context mode, and workspace mode are active?
+A fresh coordinator only needs to answer:
+1. What is required / protected?
+2. Which runtime profile and artifact mode are active?
 3. What is built or blocked?
-4. What exact source/state candidate is current?
+4. What exact candidate/state target is current?
 5. Which criteria are not `PASS`?
 6. What was the last verifier result?
 7. What is the next safe action?
-
-If the plan answers those, it is detailed enough.
