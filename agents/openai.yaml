@@ -1,7 +1,7 @@
 interface:
   display_name: "Contract–Build–Prove"
-  short_description: "Delegate build, attest candidate, verify independently"
-  default_prompt: "Use $contract-build-prove as coordinator. Preflight real builder/verifier routing, verifier clean-context independence, workspace mode, and durable plan visibility. Freeze required behavior before candidate-affecting edits. Keep one shared writer active at a time, using sequential bounded builders as needed. Integrate and freeze the exact candidate, then launch a new verifier that does not inherit parent conversation and attests/tests/re-attests the same artifact. Batch understood remediation findings and stop only on lack of progress. Prefer GPT-5.6 Luna for Codex builders when suitable and especially for final verification."
+  short_description: "Delegate build, verify clean candidate, prove completion"
+  default_prompt: "Use $contract-build-prove as coordinator. Reuse a trusted runtime profile when available, freeze required/protected behavior before candidate-affecting edits, prefer one coherent builder with one shared writer total, isolate/integrate the exact candidate, then use a new clean-context verifier that checks contract coverage and attest-tests-re-attests the same artifact. Prefer GPT-5.6 Luna for Codex builders when suitable and especially for final verification."
 
 policy:
   allow_implicit_invocation: false
