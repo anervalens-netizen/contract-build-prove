@@ -1,10 +1,27 @@
 # Lean ExecPlan reference
 
-The ExecPlan exists only so another session can resume without reconstructing the conversation. It is **control state**, not the software candidate.
+The ExecPlan exists only so another coordinator session can resume without reconstructing the conversation. It is **control state**, not the software candidate.
 
-If the repository already has one canonical planning system for the same objective, reuse it. Otherwise use `assets/EXEC_PLAN_TEMPLATE.md`, normally as a local `.cbp/PLAN.md` or another repository-approved control-state path.
+`SKILL.md` is normative.
 
-## Keep only three persistent state vocabularies
+If the repository already has one canonical planning system for the same objective, reuse it. Otherwise use `assets/EXEC_PLAN_TEMPLATE.md`, normally as `.cbp/PLAN.md` or another repository-approved control-state path.
+
+The plan location must be guaranteed visible to the **next coordinator session expected for this workstream**. Do not call an ephemeral filesystem path durable.
+
+## Minimal state
+
+Keep only:
+
+- protocol + overall status;
+- goal / protected behavior;
+- active runtime profile;
+- frozen acceptance contract;
+- current workstreams;
+- current candidate/state target;
+- last verifier result;
+- next safe action.
+
+State vocabularies:
 
 | Layer | States |
 |---|---|
@@ -12,118 +29,144 @@ If the repository already has one canonical planning system for the same objecti
 | Acceptance criterion | `UNVERIFIED`, `PASS`, `FAIL`, `BLOCKED` |
 | Overall | `ACTIVE`, `DONE`, `PARTIAL`, `BLOCKED` |
 
-The verifier report has a verdict (`PASS | FAIL | BLOCKED`) but does not create a fourth lifecycle state machine.
+The verifier reports `PASS | FAIL | BLOCKED`; that is a result, not another lifecycle state machine.
 
 ## Update cadence
 
 Update the plan only:
 
-- after baseline/runtime preflight;
-- when the frozen contract changes through an authorized amendment;
+- after runtime preflight;
+- **at contract freeze**;
+- after an authorized contract amendment;
 - after a meaningful failure/discovery that changes the next action;
 - at candidate freeze;
 - after final verification;
 - before interruption/handoff.
 
-Do not maintain a chronological progress diary. Do not paste large logs.
+Do not maintain a chronological diary. Do not paste large logs.
 
 ## Control state versus candidate source
 
-Declare the plan/control-state path explicitly.
+Declare control-state paths explicitly.
 
-Control-state changes do **not** change candidate identity. Source, tests, configuration, migrations, generated source, or other behavior-affecting repository changes do.
+Control-state changes do **not** change candidate identity. Source, tests, configuration, migrations, generated source, permissions/modes, or other behavior-affecting repository changes do.
 
-Prefer not to commit control-state changes after candidate freeze. If the repository tracks plan files, the final report must still name the exact verified source candidate rather than implying that a later metadata-only commit was verified.
+Prefer not to commit control-state updates after candidate freeze. If plan files are tracked, final reporting must still name the exact verified source candidate rather than implying a later metadata-only commit was verified.
 
 ## Contract lifecycle
 
-1. Read-only investigation may happen while the contract is draft.
-2. Freeze immediately before the first tracked repository edit or implementation-builder launch.
-3. After freeze, amendments use `OLD / NEW / REASON / IMPACT`.
-4. Explicit user authorization is required to weaken observable behavior, protected behavior, or required evidence strength.
+1. Investigation may occur while behavior is draft.
+2. Freeze required behavior, protected behavior, and evidence strength before the first candidate-affecting tracked edit or implementation-builder launch.
+3. After freeze, weakening any frozen requirement uses `OLD / NEW / REASON / IMPACT / AUTHORIZATION`.
+4. The verification technique may be refined without amendment only when equivalent or stronger and the frozen requirement is unchanged.
 
 ## Candidate identity
 
-### Preferred: committed candidate
+### Normal path: exact local commit
 
-Use an exact local commit SHA whenever repository policy permits it.
+Use an exact local commit SHA whenever local commits are permitted.
 
-The verifier must independently resolve the expected SHA and confirm that the tested source corresponds to it. Declared control-state files and allowed ignored/temp artifacts may differ; verified source may not.
+The verifier must attest the **artifact it tests**. For a commit-backed writable worktree/snapshot, resolve that snapshot to the expected commit before testing and confirm it still represents the same candidate afterward.
 
 ### Fallback: uncommitted candidate
 
-Record this tuple:
+Do **not** implement hashing rules manually.
+
+Use the bundled helper from the skill directory:
 
 ```text
-BASE_HEAD=<sha>
-TRACKED_PATCH_SHA256=<sha256>
-UNTRACKED_MANIFEST_SHA256=<sha256>
-CONTROL_STATE_PATHS=<explicit paths>
+python3 <skill-root>/scripts/candidate_id.py create --exclude .cbp/PLAN.md
 ```
 
-Canonical construction:
+It returns a deterministic `cbp1:<sha256>` identity plus diagnostic components. It covers:
 
-1. `BASE_HEAD` is the exact current HEAD.
-2. `TRACKED_PATCH_SHA256` is SHA-256 of the raw bytes of `git diff --binary --no-ext-diff --no-textconv HEAD -- .`, excluding only declared control-state paths.
-3. Enumerate every non-ignored untracked file from `git ls-files --others --exclude-standard`, excluding only declared control-state paths.
-4. Sort those relative paths bytewise. For each file, record `path`, NUL, and SHA-256 of the file bytes. SHA-256 that canonical manifest to produce `UNTRACKED_MANIFEST_SHA256`.
-5. Ignored build/cache/temp outputs are not candidate source unless the repository explicitly treats them as deliverables.
+- exact base HEAD;
+- binary tracked diff, including tracked mode changes;
+- every non-ignored untracked path;
+- Git-relevant regular-file executable mode;
+- symlink identity/target content;
+- declared control-state exclusions.
 
-The verifier recomputes the same tuple before and after testing. Any mismatch in verified source is `BLOCKED: CANDIDATE_IDENTITY_MISMATCH`.
+Add `--exclude` once per control-state path.
 
-## Workspace/artifact mode
+Verifier check:
+
+```text
+python3 <skill-root>/scripts/candidate_id.py verify <expected-cbp1-id> --exclude .cbp/PLAN.md
+```
+
+Exit `0` means match; exit `2` means identity mismatch.
+
+If neither a commit candidate nor the bundled helper can be used reliably, exact uncommitted verification is unavailable; do not invent an ad-hoc fingerprint.
+
+## Artifact identity rule
+
+**The attested artifact must be the tested artifact.**
+
+If verification uses an isolated writable copy, materialize the candidate into that copy and attest the copy itself before tests. Re-attest the same copy afterward. The parent workspace is not a proxy for a different tested snapshot.
+
+## Workspace mode
 
 Record one:
 
 - `SHARED_WORKSPACE` — builder edits the coordinator-visible workspace.
-- `ISOLATED_ARTIFACT` — builder works elsewhere and must return an exact commit/patch/artifact for integration.
+- `ISOLATED_ARTIFACT` — builder works elsewhere and returns an exact integratable artifact.
 
-Never freeze a candidate until every isolated artifact is explicitly integrated and the coordinator has inspected the resulting diff.
+In shared workspace, one write-capable child at a time. At candidate freeze, no write-capable shared child may remain active.
 
-## Drift
+## Test ownership
 
-Do not perform ritual drift checks after every action. Recheck when it matters:
+- Builder: focused development checks.
+- Coordinator: only integration-specific checks when integration creates a real risk; avoid ritual reruns.
+- Verifier: acceptance/regression authority.
 
-- on resume;
-- before integrating a returned isolated artifact;
-- at candidate freeze;
-- when unexpected repository changes appear.
-
-If drift overlaps verified source or protected user work, stop and reconcile before verification.
+Trusted immutable CI evidence tied to the exact attested candidate may be independently inspected instead of rerunning an expensive gate when it fully proves the required criterion.
 
 ## Evidence
 
-Keep evidence next to the acceptance criterion or in the last-verification block. Enough means:
+Keep evidence next to the criterion or in the last-verifier block. Enough means:
 
-- exact command/probe;
-- result/exit summary;
-- candidate identity;
-- runtime/environment when relevant.
+- exact command/probe or immutable CI/runtime evidence;
+- concise result;
+- candidate/state identity;
+- environment when relevant.
 
-No separate evidence index is required.
+No separate evidence index.
 
-## Failure control
+## Progress control
 
-Do not call normal hypothesis exploration "stagnation" merely because hypotheses fail.
+Progress means at least one of these materially improves:
 
-Escalate when there is no global improvement:
+- failed acceptance surface;
+- failure severity;
+- causal uncertainty/fault-domain size;
+- discriminating evidence.
 
-- after 3 final-verifier failures, or
-- after 2 full cycles without reducing failed criteria/severity.
+For investigation: two consecutive cycles with no information gain require a fresh synthesis/replan before another hypothesis.
 
-Perform one fresh root-cause replan. One further non-improving cycle ends in `PARTIAL` or `BLOCKED`.
+For remediation: if the same failed surface/blocker survives two consecutive cycles without material improvement or new discriminating evidence, perform one fresh root-cause synthesis/replan. One further non-improving cycle ends `PARTIAL` or `BLOCKED`.
 
-## Resume test
+Do not trigger replanning merely because several verifier attempts failed while the system is clearly converging.
 
-A fresh coordinator should be able to answer only these questions:
+## Resume
 
-1. What observable result is required?
-2. What must not change?
-3. What runtime/subagent routes and workspace mode are active?
-4. What is built or blocked?
-5. What exact candidate is current?
-6. Which criteria are not `PASS`?
-7. What was the last verifier result?
-8. What is the next safe action?
+The plan must contain:
+
+```text
+PROTOCOL=contract-build-prove
+PROTOCOL_STATE=ACTIVE
+```
+
+On session resume/context reconstruction, **reload the active CBP skill before acting**, then re-read this plan and check current repository/runtime state against it.
+
+A fresh coordinator should be able to answer:
+
+1. What result is required and what must not change?
+2. Which builder/verifier routes, verifier context mode, and workspace mode are active?
+3. What is built or blocked?
+4. What exact source/state candidate is current?
+5. Which criteria are not `PASS`?
+6. What was the last verifier result?
+7. What is the next safe action?
 
 If the plan answers those, it is detailed enough.
