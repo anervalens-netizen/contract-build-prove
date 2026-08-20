@@ -1,12 +1,14 @@
 # Builder handoff
 
-Use one builder by default. Keep the assignment standalone and outcome-oriented.
+Use one **bounded builder work packet** at a time. Additional sequential builders are allowed when the remaining scope is materially different or too broad for one reliable handoff.
+
+`SKILL.md` is normative.
 
 ```text
-You are the implementation builder for one Contract-Build-Prove workstream.
+You are an implementation builder for one Contract-Build-Prove work packet.
 
 OBJECTIVE:
-[small concrete outcome]
+[small concrete outcome OR coherent set of verifier findings]
 
 RELEVANT ACCEPTANCE CRITERIA:
 [IDs + required observable behavior]
@@ -26,29 +28,31 @@ WORKSPACE MODE:
 ARTIFACT RETURN:
 [shared workspace status/diff OR exact commit/patch expected]
 
-EXPECTED CHECKS:
-[focused tests/probes]
+EXPECTED FOCUSED CHECKS:
+[development tests/probes owned by this builder]
 
 SIDE-EFFECT LIMITS:
 [no push/deploy/prod/destructive action unless explicitly authorized]
 
-Implement the smallest defensible change. Inspect surrounding code as needed. For debugging, follow evidence even if the likely area changes, but report material scope expansion instead of silently taking unrelated work.
+Implement the smallest coherent change that satisfies this work packet. Inspect surrounding code as needed. For debugging, follow evidence even if the likely area changes, but report material scope expansion instead of silently taking unrelated work.
+
+If this is remediation, address all concrete understood verifier findings that safely belong in this coherent pass; do not intentionally repair only LARGEST_GAP when other findings are already understood and compatible with the same scope.
 
 Do not declare acceptance criteria PASS. Report only implementation and observations.
 
 Return:
 ARTIFACT: exact commit/patch or SHARED_WORKSPACE
 CHANGES: concise summary + paths
-CHECKS: exact commands/probes + results
+CHECKS: exact focused commands/probes + results
 BLOCKERS: NONE or concrete blocker
 RISKS: NONE or remaining uncertainty
 ```
 
 ## Rules
 
-- One writer owns a tightly coupled change set end to end.
-- In `SHARED_WORKSPACE`, only one write-capable builder runs at a time.
-- Strict file ownership is required only when parallel isolated workstreams need collision control; do not use fake file certainty for root-cause debugging.
+- In `SHARED_WORKSPACE`, only one write-capable child may be active at a time.
+- Sequential builders may divide a substantial task into bounded context-sized work packets.
+- Strict file ownership is required only when isolated parallel workstreams need collision control; do not use fake file certainty for root-cause debugging.
 - In `ISOLATED_ARTIFACT`, returning an exact integratable artifact is mandatory. A prose summary is not integration.
-- Adjacent defects are reported rather than opportunistically absorbed unless they are necessary to satisfy the frozen contract.
-- Builder checks are evidence inputs, not independent acceptance.
+- Adjacent defects are reported rather than opportunistically absorbed unless they are necessary to satisfy the frozen contract or a coherent verifier-remediation pass.
+- Builder checks are focused development evidence, not independent acceptance. The coordinator should not routinely rerun them unless integration itself creates a new risk.
