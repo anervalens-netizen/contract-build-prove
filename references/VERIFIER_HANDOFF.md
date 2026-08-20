@@ -1,73 +1,91 @@
 # Independent verifier handoff
 
-Use this contract whenever a fresh subagent verifies a frozen Contract-Build-Prove candidate.
+Use this for every final verification attempt. Each attempt gets a **new child context**.
 
-The verifier is an acceptance authority, not a second builder.
+The verifier is acceptance authority, not a repair agent.
 
 ## What to pass
 
 Pass only:
 
 - objective;
-- rigor level;
-- frozen acceptance contract and recorded amendments;
-- relevant baseline and protected behavior;
-- exact candidate SHA or workspace fingerprint;
-- repository path/ref needed to inspect that candidate;
-- allowed verification targets/tools;
-- any sanitized verification artifact that cannot safely be regenerated;
-- access limitations.
+- frozen acceptance contract + authorized amendments;
+- protected behavior/non-goals;
+- exact expected candidate identity;
+- declared control-state paths;
+- repository/workspace/ref needed to inspect it;
+- runtime/environment verification target;
+- allowed tools/access and side-effect limits.
 
-Do **not** pass:
+Do not pass builder confidence, a defense of the implementation, or the desired verdict.
 
-- builder confidence;
-- a prose defense of the implementation;
-- the desired verdict;
-- hidden criteria not present in the frozen contract.
+## Mandatory procedure
 
-## Generic verifier prompt
+### Step 0 — candidate attestation
+
+Before any acceptance test:
+
+1. independently resolve/recompute candidate identity using `references/PLANS.md`;
+2. compare it with the coordinator-supplied identity;
+3. confirm any workspace differences are limited to declared control state or allowed ignored/temp artifacts;
+4. on mismatch, stop with:
 
 ```text
-Act as the independent acceptance verifier for this repository candidate.
+VERDICT: BLOCKED
+LARGEST_GAP: CANDIDATE_IDENTITY_MISMATCH
+```
 
-You did not implement this candidate. Do not implement or repair it during verification. Do not trust builder claims. Inspect the real candidate and decide only from the frozen contract and evidence you can independently observe.
+Never copy the supplied SHA/fingerprint into evidence without independently checking it.
+
+### Step 1 — verify the contract
+
+Inspect the real candidate and evaluate every required criterion from direct evidence. Prefer executable tests/runtime probes. Treat missing proof as `BLOCKED`, not PASS. Do not implement or repair the candidate.
+
+When tests need writes, use an isolated writable snapshot/worktree/sandbox if available. Test caches, build output, coverage, browser artifacts, and temporary databases may be written there. Do not intentionally modify tracked candidate source.
+
+### Step 2 — candidate postflight
+
+After tests, recompute/re-resolve candidate identity again.
+
+If verified source changed during verification, return `BLOCKED: CANDIDATE_IDENTITY_MISMATCH` even if tests passed.
+
+## Generic prompt
+
+```text
+Act as the independent acceptance verifier for this frozen Contract-Build-Prove candidate.
+
+You did not implement it. Do not repair it. Do not trust builder claims.
 
 OBJECTIVE:
 [objective]
 
-RIGOR:
-[STANDARD | HIGH_ASSURANCE]
+PROTECTED BEHAVIOR / NON-GOALS:
+[relevant facts]
 
-BASELINE / PROTECTED BEHAVIOR:
-[relevant facts only]
-
-FROZEN ACCEPTANCE CONTRACT:
+FROZEN ACCEPTANCE CONTRACT + AMENDMENTS:
 [criteria]
 
-CONTRACT AMENDMENTS:
-[none or recorded OLD/NEW/REASON/IMPACT]
+EXPECTED CANDIDATE IDENTITY:
+[commit SHA OR canonical uncommitted tuple]
 
-CANDIDATE IDENTITY:
-[commit SHA OR HEAD + deterministic workspace fingerprint]
+CONTROL-STATE PATHS:
+[paths or NONE]
 
-VERIFICATION TARGETS / ACCESS:
-[commands, services, URLs, sandbox constraints]
+VERIFICATION TARGET / ACCESS:
+[repo/ref/commands/services/sandbox limits]
 
-Evaluate every required criterion. Prefer direct executable or runtime proof. For High Assurance, probe relevant negative/boundary cases when permitted. Treat anything you cannot actually inspect as UNVERIFIED, not PASS.
+First independently attest candidate identity using the CBP plan rules. Then verify every criterion from direct evidence. Finally attest candidate identity again.
 
 Return exactly:
 VERDICT: PASS | FAIL | BLOCKED
-CONTRACT: criterion -> PASS | FAIL | BLOCKED, with reason
-EVIDENCE: exact commands/probes, results, paths/URLs, candidate SHA/fingerprint
-FINDINGS: concrete defects/regressions, highest severity first
-UNVERIFIED: anything not actually observed
-LARGEST_GAP: single next remediation target, or NONE
+CONTRACT: criterion -> PASS | FAIL | BLOCKED, with concise reason
+EVIDENCE: exact commands/probes + results + independently attested candidate identity
+FINDINGS: concrete defects/regressions, highest severity first, or NONE
+LARGEST_GAP: single next remediation/unblock target, or NONE
 ```
 
 ## Verdict semantics
 
-- `PASS`: every required criterion is supported by evidence for the exact candidate.
-- `FAIL`: at least one required criterion is contradicted by observed evidence.
-- `BLOCKED`: truth cannot be established because essential access, environment, dependency, or evidence is unavailable.
-
-Do not turn missing evidence into speculative failure. Do not turn plausible code into a pass.
+- `PASS`: every required criterion is supported by direct evidence and candidate identity matched before/after verification.
+- `FAIL`: the candidate identity is valid, but observed evidence contradicts at least one criterion.
+- `BLOCKED`: truth cannot safely be established because candidate identity, access, environment, dependency, or required proof is unavailable.
