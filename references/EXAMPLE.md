@@ -1,84 +1,79 @@
 # Minimal end-to-end example
 
-This example demonstrates the process shape, not a repository-specific implementation.
+Objective: fix `POST /profile` accepting an empty display name with `200` instead of `400`.
 
-## Objective
+Rigor: Standard.
 
-Fix an API bug where `POST /profile` accepts an invalid empty display name and returns `200` instead of `400`.
+## 1. Preflight + investigation
 
-Rigor: Standard CBP.
+```text
+HARNESS=Codex
+BUILDER_ROUTE=worker/Luna
+VERIFIER_ROUTE=verifier/Luna
+FRESH_CONTEXT_SUPPORTED=YES
+WORKSPACE_MODE=SHARED_WORKSPACE
+RESULT=READY
+```
 
-## Baseline
+Baseline: HEAD `aaa111`, clean workspace, valid profile updates must remain `200`.
 
-- HEAD: `aaa111`
-- working tree: clean
-- existing unrelated behavior to protect: valid profile updates still return `200`
+Existing behavior reproduces the bug: empty display name returns `200`.
 
-## Frozen contract
+## 2. Freeze contract
 
-| ID | Behavior | Verification | Status |
+| ID | Required behavior | Protected behavior | Verification |
 |---|---|---|---|
-| AC-1 | empty display name returns `400` | API test with `""` | UNVERIFIED |
-| AC-2 | valid display name still returns `200` | existing happy-path API test | UNVERIFIED |
+| AC-1 | empty display name returns `400` | valid profile update unaffected | invalid-name API test |
+| AC-2 | valid unicode display name returns `200` | unicode names remain valid | existing unicode API test |
 
-Pre-fix reproduction confirms AC-1 currently fails: request returns `200`.
+The coordinator freezes this contract **before** launching the implementation builder.
 
-Contract freezes before implementation.
+## 3. Builder
 
-## Builder subagent
+One builder changes validation and adds the regression test. It self-tests but does not mark criteria PASS.
 
-The coordinator launches a scoped builder subagent. It changes validation in the profile request path, adds a regression test, runs targeted checks, and returns its handoff.
+Coordinator inspects the actual shared-workspace diff, runs relevant regression checks, and creates candidate commit:
 
-The coordinator inspects/integrates the result and freezes candidate commit `bbb222`.
+```text
+bbb222
+```
 
-## Independent verification #1
+## 4. Fresh verifier #1
 
-A fresh verifier receives only the objective, frozen contract, relevant baseline, candidate `bbb222`, and verification targets.
+Before tests, the verifier independently resolves the workspace source to `bbb222`.
 
 ```text
 VERDICT: FAIL
-CONTRACT: AC-1 -> PASS; AC-2 -> FAIL
-EVIDENCE: invalid-name test returns 400; existing valid unicode-name test now returns 400 on bbb222
+CONTRACT: AC-1 -> PASS; AC-2 -> FAIL — valid unicode name returns 400
+EVIDENCE: candidate bbb222 attested pre/post; invalid-name test passes; unicode test fails
 FINDINGS: validation rejects valid non-ASCII display names
-UNVERIFIED: NONE
 LARGEST_GAP: preserve valid unicode display names
 ```
 
-No criteria are silently rewritten. The affected task returns to building.
+The candidate identity still matches after verification, so this is a real functional FAIL rather than an identity problem.
 
-## Remediation
+## 5. Targeted remediation
 
-The coordinator launches a builder to fix the demonstrated over-broad validation and rerun affected local checks.
+Coordinator launches a builder for the demonstrated gap only. After integration and checks, the new candidate is:
 
-After integration, the new candidate commit is `ccc333`.
+```text
+ccc333
+```
 
-The previous verification is invalid because verified source changed.
+The earlier verdict no longer applies because verified source changed.
 
-## Independent verification #2
+## 6. Fresh verifier #2
 
-A fresh verifier checks `ccc333`.
+A **new** verifier child independently attests `ccc333`, runs the contract checks, then attests the candidate again.
 
 ```text
 VERDICT: PASS
 CONTRACT: AC-1 -> PASS; AC-2 -> PASS
-EVIDENCE: targeted API tests pass on ccc333; valid unicode regression passes
+EVIDENCE: candidate ccc333 attested pre/post; targeted API tests pass
 FINDINGS: NONE
-UNVERIFIED: NONE
 LARGEST_GAP: NONE
 ```
 
-## Close
+Overall: `DONE`.
 
-Relevant regression gate passes on unchanged candidate `ccc333`.
-
-Overall outcome: `DONE`.
-
-Key properties demonstrated:
-
-- red → green bug reproduction;
-- frozen criteria;
-- coordinator delegates implementation;
-- builder and verifier are separate contexts;
-- verification is tied to an exact candidate;
-- source changes invalidate earlier verification;
-- a failed verification repairs the demonstrated gap instead of redefining success.
+The example demonstrates the intended normal shape: **one builder, one final verifier attempt unless remediation is actually required**.
