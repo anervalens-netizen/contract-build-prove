@@ -2,20 +2,23 @@
 
 Read this only when the task changes persistent external state: database/schema/data, auth/identity state, deployed infrastructure, queues, external services/resources, or another target that cannot be described by source code alone.
 
-The purpose is to prevent a failed mutation from falling blindly into the normal `FAIL → patch → retry` loop.
+`SKILL.md` is normative.
 
-## Candidate state tuple
+The purpose is to prevent a failed mutation from falling blindly into the normal remediation loop.
+
+## Stateful target
 
 Record only the fields that apply:
 
 ```text
-SOURCE_ID=<verified source SHA/fingerprint>
+SOURCE_ID=<verified source SHA/cbp1 identity>
 ENVIRONMENT_ID=<staging/prod/cluster/account/database/etc.>
 DEPLOYED_ID=<artifact/image/release digest or N/A>
 EXTERNAL_STATE_ID=<schema version/state marker/resource version or N/A>
+RECOVERY_REQUIRED=<YES|NO>
 ```
 
-The verifier must know which tuple it is checking. Source SHA alone is insufficient after an external mutation.
+Put the same target in the ExecPlan and verifier handoff. Source identity alone is insufficient after an external mutation.
 
 ## Before mutation
 
@@ -29,36 +32,49 @@ Require:
 
 ## After mutation
 
-Re-read the actual external state. Do not assume the intended transition completed.
+Re-read actual external state. Never assume the intended transition completed.
 
-Update `DEPLOYED_ID` / `EXTERNAL_STATE_ID` from observed state before acceptance verification.
+Update `DEPLOYED_ID` / `EXTERNAL_STATE_ID` from observed state before final verification.
 
-## Recovery gate
+## Recovery precedence
 
 If an authorized stateful/irreversible operation fails or leaves ambiguous partial state:
 
 ```text
-RECOVERY_REQUIRED = YES
+RECOVERY_REQUIRED=YES
 ```
 
-Then:
+This **overrides the normal `FAIL → builder remediation` path**.
+
+Do not launch ordinary remediation against an assumed starting state. Instead:
 
 1. stop further irreversible mutation;
 2. inspect and re-baseline actual external state;
 3. determine whether safe rollback is possible;
 4. otherwise define an explicit forward-recovery plan from the **current** state;
 5. obtain any authorization required for the recovery action;
-6. only then create a new source+state candidate and continue.
+6. perform the authorized recovery transition;
+7. observe the resulting state again;
+8. only then clear `RECOVERY_REQUIRED` and create the next source+state candidate.
 
-Do not re-run the original migration/action merely because the source candidate changed.
-
-Clear `RECOVERY_REQUIRED` only after the environment is in a known state with a safe next transition.
+Do not rerun the original migration/action merely because source changed.
 
 ## Verification
 
-Final `PASS` for stateful work requires evidence against the current state tuple, not only local source tests.
+Pass the target explicitly to `VERIFIER_HANDOFF.md`:
 
-Examples of useful proof, when applicable:
+```text
+STATEFUL_TARGET:
+SOURCE_ID=...
+ENVIRONMENT_ID=...
+DEPLOYED_ID=...
+EXTERNAL_STATE_ID=...
+RECOVERY_REQUIRED=NO
+```
+
+Final `PASS` requires evidence against the current target tuple, not only local source tests.
+
+Useful proof may include:
 
 - deployed artifact digest matches expected source;
 - schema/version marker matches expected state;
