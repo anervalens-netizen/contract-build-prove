@@ -1,83 +1,84 @@
 # Contract-Build-Prove
 
-A Codex skill for substantial repository work where "the code changed" is not enough evidence that the task is complete.
+A multi-harness skill for substantial repository work where "the code changed" is not enough evidence that the task is complete.
 
-It uses a simple discipline:
+It is designed for **Codex, DeepSeek Harness (DSH), and other skill/subagent-capable agent harnesses**.
 
-**Contract → Build → Freeze candidate → Independent proof → Close**
+Core architecture:
+
+**Coordinator → Builder subagents → Integration → Frozen candidate → Independent verifier subagent → Remediate or close**
 
 The design goal is **minimum process that makes false completion difficult**.
 
-## When it helps
+## Agent roles
 
-Use it for multi-session or multi-component work, migrations, deployments, difficult bug fixes, and high-risk domains where another agent should independently verify the result.
+### Coordinator
+Owns the user objective, acceptance contract, decomposition, plan, protected work, integration, candidate identity, and final state. It should not become the default implementation worker for substantial tasks.
 
-Small local low-risk edits stay on the normal fast lane.
+### Builder subagents
+Receive small standalone work packets, implement them, run local checks, and return evidence/blockers. They do not authorize their own acceptance.
+
+### Verifier subagents
+Start in a fresh context, did not implement the candidate, inspect the real integrated artifact, and return `PASS | FAIL | BLOCKED` against the frozen contract.
+
+For **Standard CBP**, normally use one final verifier for the integrated candidate rather than one verifier per builder. For **High Assurance**, add intermediate independent verification only at critical boundaries where the extra cost materially reduces risk.
 
 ## Rigor levels
 
-- **Fast** — normal repository workflow; local/reversible/low-risk work.
-- **Standard CBP** — persistent ExecPlan + frozen acceptance contract + one final independent audit.
-- **High Assurance** — adds pre-build contract critique, stronger negative/boundary proof, and intermediate audits only where risk justifies them.
+- **Fast** — local/reversible/low-risk work; normal workflow; subagents optional.
+- **Standard CBP** — coordinator + ExecPlan + frozen contract + delegated builders when available + one final independent verifier.
+- **High Assurance** — Standard plus contract critique, stronger negative/boundary proof, and selective intermediate verification.
+
+## Runtime support
+
+### OpenAI Codex
+Uses the same `SKILL.md`. `agents/openai.yaml` provides Codex-specific UI/invocation metadata. Builder and verifier roles map to Codex subagents; optional custom auditors can live under `.codex/agents/` or `~/.codex/agents/`.
+
+### DeepSeek Harness (DSH)
+DSH supports skills and a subagent capability. A project may discover this skill from `.agents/skills/contract-build-prove/`, so the same repository installation can be shared with Codex. The coordinator delegates builder and verifier tasks through DSH's configured subagent provider(s).
+
+DSH is currently a developer preview and its APIs/configuration may change; therefore the core skill avoids hardcoding DSH provider names or plugin configuration. Runtime mapping lives in `references/RUNTIMES.md`.
+
+### Other harnesses
+If the harness can load `SKILL.md`-style instructions and launch independent child agents/contexts, map its capabilities to the same three roles. If it cannot provide independent verification, Standard/High-Assurance completion must not pretend that independence exists.
 
 ## Files
 
-- `SKILL.md` — critical workflow and invariants loaded when the skill runs.
-- `agents/openai.yaml` — Codex/ChatGPT UI metadata and invocation policy.
+- `SKILL.md` — compact, runtime-neutral critical workflow.
+- `agents/openai.yaml` — Codex-specific UI metadata and invocation policy; harmless/optional outside Codex.
 - `assets/EXEC_PLAN_TEMPLATE.md` — persistent plan template.
+- `references/RUNTIMES.md` — Codex/DSH/generic role mapping.
 - `references/PLANS.md` — state model, evidence, drift, candidate identity, resume rules.
-- `references/AUDITOR_HANDOFF.md` — generic fresh-auditor prompt and verdict semantics.
+- `references/AUDITOR_HANDOFF.md` — generic fresh-verifier prompt and verdict semantics.
 - `references/EXAMPLE.md` — minimal FAIL → remediation → PASS example.
-- `references/auditor.example.toml` — optional custom Codex auditor.
+- `references/auditor.example.toml` — optional Codex custom auditor example.
 
-## Install as a repository skill
+## Install in a repository
 
-Place this directory at:
+Use:
 
 ```text
 .agents/skills/contract-build-prove/
 ```
 
-Then invoke explicitly with:
+This location is compatible with Codex and is also discoverable by DeepSeek Harness.
+
+Explicit Codex invocation:
 
 ```text
 $contract-build-prove
 ```
 
-The skill also allows implicit invocation when the task matches its description.
-
-## Optional custom auditor
-
-The skill does **not** require a custom auditor. It falls back to a fresh built-in `default` subagent when no configured `auditor` or `reviewer` exists.
-
-For a dedicated auditor, copy:
-
-```text
-references/auditor.example.toml
-```
-
-to either:
-
-```text
-.codex/agents/auditor.toml
-```
-
-for one repository, or:
-
-```text
-~/.codex/agents/auditor.toml
-```
-
-for the user account.
-
-The example intentionally does not pin a model, so it can inherit the current Codex subagent model policy.
+DSH invocation depends on its active skill consumer/UI; once the skill is discovered, load/select `contract-build-prove` through the harness's skill capability.
 
 ## Core safety properties
 
+- substantial work is orchestrated, not performed monolithically by the coordinator when subagents exist;
 - acceptance criteria cannot be silently weakened after implementation begins;
+- builders cannot self-authorize acceptance;
 - final acceptance is tied to an exact candidate SHA/fingerprint;
-- any post-audit source edit invalidates the audit;
-- independent audit does not receive the builder's confidence or intended conclusion;
+- any post-audit source edit invalidates the prior audit;
+- independent verification does not receive builder confidence or desired verdict;
 - user/newer work is protected across resume and integration;
 - push/merge/deploy/production mutation requires explicit authorization or repository policy;
 - missing independent proof is reported as a limitation, never simulated.
