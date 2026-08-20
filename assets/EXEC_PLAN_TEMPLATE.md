@@ -1,10 +1,13 @@
 # [Objective]
 
+PROTOCOL=contract-build-prove
+PROTOCOL_STATE=ACTIVE
 Overall: ACTIVE
 Rigor: STANDARD | HIGH_ASSURANCE
 Control state path: [this file/path]
+Plan visible to next expected coordinator session: YES | NO
 
-## Goal and boundaries
+## Goal / must not change
 
 Goal: [observable user-visible result]
 
@@ -14,12 +17,13 @@ Must not change:
 Authorization boundaries:
 - [push/merge/deploy/prod/destructive/cost boundary]
 
-## Runtime preflight
+## Runtime profile
 
 - Harness: [Codex | DSH | other]
 - Builder route/model: [actual resolved route/model]
-- Verifier route/model: [actual resolved route/model]
-- Fresh verifier context: YES | NO
+- Verifier route/model/policy: [actual resolved route/model/policy]
+- Verifier new child: YES | NO
+- Verifier inherits parent conversation: NO | YES
 - Workspace mode: SHARED_WORKSPACE | ISOLATED_ARTIFACT
 - Preflight: READY | BLOCKED
 
@@ -32,11 +36,11 @@ Authorization boundaries:
 ## Acceptance contract
 
 Contract: DRAFT | FROZEN
-Frozen before first tracked edit/builder launch: [timestamp or NO]
+Frozen before first candidate-affecting edit/builder launch: [timestamp or NO]
 
-| ID | Required behavior | Protected behavior | Verification + expected result | Status / evidence |
+| ID | Required behavior | Protected behavior | Verification approach + expected result | Status / evidence |
 |---|---|---|---|---|
-| AC-1 | [behavior] | [must remain true] | `[probe]` → [expected] | UNVERIFIED |
+| AC-1 | [behavior] | [must remain true] | `[probe/evidence]` → [expected] | UNVERIFIED |
 
 Amendments: NONE
 
@@ -48,28 +52,35 @@ Amendments: NONE
 |---|---|---|---|---|
 | W1 | [builder] | shared | READY | NONE |
 
-## Candidate
+## Current candidate / state target
 
-- Identity: UNVERIFIED
-- Basis: [commit SHA OR BASE_HEAD + patch/untracked fingerprints]
+- Source identity: UNVERIFIED
+- Identity basis: [commit SHA OR cbp1 helper identity]
 - Control-state exclusions: [paths]
 - Builder artifacts integrated: NO
+- No active shared writer: NO
 - Candidate frozen: NO
+
+Stateful target: N/A
+<!-- When applicable:
+SOURCE_ID=
+ENVIRONMENT_ID=
+DEPLOYED_ID=
+EXTERNAL_STATE_ID=
+RECOVERY_REQUIRED=YES|NO
+-->
 
 ## Last verifier result
 
 - Verifier child/model: UNVERIFIED
-- Candidate attested pre/post: UNVERIFIED
+- Clean context confirmed: UNVERIFIED
+- Tested artifact: UNVERIFIED
+- Candidate attested pre/post on same artifact: UNVERIFIED
+- Stateful target: N/A | PASS | BLOCKED
 - Verdict: UNVERIFIED
 - Failed/blocked criteria: NONE | [IDs]
-- Largest gap: NONE | [gap]
-- Evidence: [concise commands/probes + results]
-
-## External-state recovery — only if applicable
-
-- State identity: N/A
-- Recovery required: NO
-- Rollback/forward-recovery decision: N/A
+- Largest gap: NONE | [priority gap]
+- Evidence: [concise commands/probes/immutable evidence + results]
 
 ## Next action
 
