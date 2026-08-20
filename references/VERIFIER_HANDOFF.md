@@ -2,15 +2,11 @@
 
 Use this for every final verification attempt. Each attempt gets a **new child with no inherited coordinator/builder conversation**.
 
-The verifier is acceptance authority, not a repair agent.
-
-`SKILL.md` is normative.
+The verifier is acceptance authority, not a repair agent. `SKILL.md` is normative.
 
 ## Independence gate
 
-This handoff is valid only when the verifier context is clean.
-
-If the verifier can see inherited parent/coordinator implementation conversation beyond this handoff, stop with:
+If the verifier can see inherited implementation/coordinator conversation beyond this handoff:
 
 ```text
 VERDICT: BLOCKED
@@ -22,58 +18,67 @@ A new child ID alone is insufficient.
 ## What to pass
 
 Pass only:
-
 - objective;
 - frozen acceptance contract + authorized amendments;
 - protected behavior/non-goals;
 - exact expected candidate identity;
 - declared control-state paths;
 - exact artifact/workspace/ref to verify;
-- runtime/environment verification target;
+- runtime/environment target;
 - optional `STATEFUL_TARGET`;
-- allowed tools/access and side-effect limits.
+- allowed tools/access + side-effect limits.
 
 Do not pass builder confidence, implementation defense, hidden criteria, or desired verdict.
 
-## Mandatory invariant
+## Mandatory procedure
+
+### Step 0 — contract coverage
+
+Compare the frozen contract with the supplied objective and protected behavior.
+
+If an **objective-essential requirement is clearly absent**, stop:
+
+```text
+VERDICT: BLOCKED
+LARGEST_GAP: CONTRACT_COVERAGE_GAP
+```
+
+Do not invent new requirements or broaden scope. This gate only prevents certification of an obviously incomplete contract.
+
+### Step 1 — materialize and attest the artifact
 
 > **THE ATTESTED ARTIFACT MUST BE THE TESTED ARTIFACT.**
 
-If tests require an isolated writable snapshot/worktree:
+For a commit candidate, default to a clean isolated worktree/snapshot materialized from the exact SHA.
 
-1. materialize the exact candidate into that snapshot;
-2. attest the snapshot itself;
-3. run tests against that snapshot;
-4. re-attest that same snapshot.
+If testing another workspace, first prove it has no candidate-affecting tracked/untracked differences from that SHA except declared control metadata.
 
-Never attest the parent workspace and test a different copy.
+For uncommitted candidates, use `scripts/candidate_id.py verify` from `references/PLANS.md`.
 
-## Mandatory procedure
+Before tests, independently attest identity **inside the artifact that will be tested**. Mismatch:
 
-### Step 0 — attest the tested artifact
+```text
+VERDICT: BLOCKED
+LARGEST_GAP: CANDIDATE_IDENTITY_MISMATCH
+```
 
-Before acceptance testing:
+Never copy the supplied identity into evidence without checking it.
 
-1. independently resolve/recompute identity **inside the artifact that will be tested** using `references/PLANS.md`;
-2. compare with the coordinator-supplied identity;
-3. confirm differences are only declared control state or allowed ignored/temp outputs;
-4. on mismatch, stop with `BLOCKED: CANDIDATE_IDENTITY_MISMATCH`.
+### Step 2 — verify behavior
 
-Never copy a supplied SHA/fingerprint into evidence without checking it.
+Evaluate every criterion from direct evidence against the attested artifact.
 
-### Step 1 — verify the contract
+Candidate-authored tests are evidence only after confirming they actually exercise and assert the frozen behavior. For important criteria, use an independent probe when needed and feasible.
 
-Evaluate every required criterion from direct evidence against the attested artifact.
+Immutable CI/runtime evidence tied to the exact candidate may replace an expensive rerun when it fully proves the criterion.
 
-Prefer executable/runtime evidence. Trusted immutable CI evidence tied to the exact candidate may be independently inspected instead of rerunning an expensive gate when it fully proves the criterion.
+Missing required proof is `BLOCKED`, not PASS. Do not implement or repair the candidate.
 
-Treat missing required proof as `BLOCKED`, not PASS. Do not implement or repair the candidate.
+Normal cache/build/coverage/browser/temp-database writes are allowed in the tested artifact when needed; do not intentionally modify candidate source.
 
-Normal cache/build/coverage/browser/temp-database writes are allowed in the tested artifact when needed, but do not intentionally modify tracked candidate source.
+### Step 3 — verify stateful target when present
 
-### Step 2 — verify stateful target when present
-
-If `STATEFUL_TARGET` is not `N/A`, verify the applicable tuple:
+If `STATEFUL_TARGET != N/A`, verify:
 
 ```text
 SOURCE_ID=
@@ -83,20 +88,27 @@ EXTERNAL_STATE_ID=
 RECOVERY_REQUIRED=
 ```
 
-`PASS` requires both the source candidate and applicable external-state tuple to match the accepted target, with `RECOVERY_REQUIRED=NO`.
+PASS requires the applicable tuple to match and `RECOVERY_REQUIRED=NO`.
 
-### Step 3 — postflight the same artifact
+### Step 4 — postflight the same artifact
 
-After verification, recompute/re-resolve identity in the **same artifact that was tested**.
+Re-attest the **same artifact that was tested**. Source identity change → `BLOCKED: CANDIDATE_IDENTITY_MISMATCH`, even if tests passed.
 
-If verified source changed, return `BLOCKED: CANDIDATE_IDENTITY_MISMATCH` even if tests passed.
+## Verdict precedence
+
+Use this order so mixed results are deterministic:
+
+1. independence, candidate-identity, contract-coverage, or unsafe-state blocker → `BLOCKED`;
+2. otherwise any criterion `FAIL` → `FAIL`;
+3. otherwise any criterion/state target `BLOCKED` → `BLOCKED`;
+4. otherwise all required criteria/state targets `PASS` → `PASS`.
 
 ## Generic prompt
 
 ```text
-Act as the independent acceptance verifier for this frozen Contract-Build-Prove candidate.
+Act as the independent acceptance verifier for this Contract-Build-Prove candidate.
 
-This must be a clean verifier context. You did not implement the candidate. Do not repair it and do not trust builder claims.
+This is a clean verifier context. You did not implement the candidate. Do not repair it or trust builder claims.
 
 OBJECTIVE:
 [objective]
@@ -104,28 +116,29 @@ OBJECTIVE:
 PROTECTED BEHAVIOR / NON-GOALS:
 [relevant facts]
 
-FROZEN ACCEPTANCE CONTRACT + AMENDMENTS:
+FROZEN CONTRACT + AMENDMENTS:
 [criteria]
 
-EXPECTED CANDIDATE IDENTITY:
-[commit SHA OR cbp1 identity]
+EXPECTED CANDIDATE:
+[commit SHA OR cbp2 identity]
 
-TESTED ARTIFACT / WORKSPACE:
-[exact repo/worktree/snapshot/ref]
+TESTED ARTIFACT:
+[exact clean worktree/snapshot/workspace/ref]
 
-CONTROL-STATE PATHS:
+CONTROL STATE:
 [paths or NONE]
 
 STATEFUL_TARGET:
 [N/A OR SOURCE_ID / ENVIRONMENT_ID / DEPLOYED_ID / EXTERNAL_STATE_ID / RECOVERY_REQUIRED]
 
-VERIFICATION TARGET / ACCESS:
+ACCESS:
 [commands/services/CI/runtime/sandbox limits]
 
-First attest the artifact you will actually test. Verify every criterion against that same artifact. If STATEFUL_TARGET exists, verify it too. Finally re-attest the same tested artifact.
+First check contract coverage. Then attest the exact artifact you will test, verify the contract/state target, and re-attest that same artifact.
 
 Return exactly:
 VERDICT: PASS | FAIL | BLOCKED
+CONTRACT_COVERAGE: PASS | BLOCKED, with concise reason
 CONTRACT: criterion -> PASS | FAIL | BLOCKED, with concise reason
 ARTIFACT: tested artifact + independently attested identity pre/post
 STATEFUL: N/A | PASS | BLOCKED, with concise reason
@@ -134,10 +147,4 @@ FINDINGS: concrete defects/regressions, highest severity first, or NONE
 LARGEST_GAP: highest-priority remediation/unblock target, or NONE
 ```
 
-## Verdict semantics
-
-- `PASS`: every required criterion is proven for the same attested/tested artifact; applicable stateful target also passes.
-- `FAIL`: identity is valid, but evidence contradicts one or more criteria.
-- `BLOCKED`: truth cannot safely be established because independence, identity, access, environment, dependency, state, or required proof is unavailable.
-
-`LARGEST_GAP` sets priority only. It does **not** mean the next remediation pass should intentionally ignore other understood findings.
+`LARGEST_GAP` sets priority only; it does not limit the next coherent remediation pass to one finding.
