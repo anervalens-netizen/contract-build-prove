@@ -1,11 +1,11 @@
 # [Objective]
 
 PROTOCOL=contract-build-prove
-PROTOCOL_STATE=ACTIVE
+PROTOCOL_VERSION=5
 Overall: ACTIVE
 Rigor: STANDARD | HIGH_ASSURANCE
 Control state path: [this file/path]
-Plan visible to next expected coordinator session: YES | NO
+Plan visible to next coordinator session: YES | NO
 
 ## Goal / must not change
 
@@ -15,13 +15,14 @@ Must not change:
 - [protected behavior/non-goal]
 
 Authorization boundaries:
-- [push/merge/deploy/prod/destructive/cost boundary]
+- [push/merge/deploy/publish/prod/destructive/paid/irreversible boundary]
 
 ## Runtime profile
 
+- Profile: [trusted profile id | AD_HOC]
 - Harness: [Codex | DSH | other]
-- Builder route/model: [actual resolved route/model]
-- Verifier route/model/policy: [actual resolved route/model/policy]
+- Builder route/model: [resolved]
+- Verifier route/model/policy: [resolved]
 - Verifier new child: YES | NO
 - Verifier inherits parent conversation: NO | YES
 - Workspace mode: SHARED_WORKSPACE | ISOLATED_ARTIFACT
@@ -30,7 +31,8 @@ Authorization boundaries:
 ## Baseline
 
 - Branch / HEAD: [branch] / [SHA]
-- Working tree / protected user-newer work: [concise state]
+- Protected pre-existing user/newer work: [NONE or concise state]
+- Authorized baseline dependencies from pre-existing work: [NONE or explicit paths/commits]
 - Relevant external/runtime state: [only when applicable]
 
 ## Acceptance contract
@@ -38,7 +40,7 @@ Authorization boundaries:
 Contract: DRAFT | FROZEN
 Frozen before first candidate-affecting edit/builder launch: [timestamp or NO]
 
-| ID | Required behavior | Protected behavior | Verification approach + expected result | Status / evidence |
+| ID | Required behavior | Protected behavior | Proof method + expected result | Status / evidence |
 |---|---|---|---|---|
 | AC-1 | [behavior] | [must remain true] | `[probe/evidence]` → [expected] | UNVERIFIED |
 
@@ -55,11 +57,13 @@ Amendments: NONE
 ## Current candidate / state target
 
 - Source identity: UNVERIFIED
-- Identity basis: [commit SHA OR cbp1 helper identity]
+- Basis: [commit SHA OR cbp2 helper identity]
 - Control-state exclusions: [paths]
+- Protected work isolated/authorized: NO
 - Builder artifacts integrated: NO
 - No active shared writer: NO
 - Candidate frozen: NO
+- Verifier artifact strategy: [CLEAN_COMMIT_SNAPSHOT | VERIFIED_WORKSPACE | CBP2_WORKSPACE]
 
 Stateful target: N/A
 <!-- When applicable:
@@ -74,8 +78,9 @@ RECOVERY_REQUIRED=YES|NO
 
 - Verifier child/model: UNVERIFIED
 - Clean context confirmed: UNVERIFIED
+- Contract coverage: UNVERIFIED
 - Tested artifact: UNVERIFIED
-- Candidate attested pre/post on same artifact: UNVERIFIED
+- Candidate attested pre/post: UNVERIFIED
 - Stateful target: N/A | PASS | BLOCKED
 - Verdict: UNVERIFIED
 - Failed/blocked criteria: NONE | [IDs]
