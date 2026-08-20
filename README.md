@@ -6,7 +6,7 @@ Designed for **OpenAI Codex, DeepSeek Harness (DSH), and compatible subagent-cap
 
 Core flow:
 
-**Preflight → Investigate → Freeze contract → Builder → Integrate/freeze candidate → Fresh verifier → Remediate or close**
+**Preflight → Contract → Build → Candidate → Prove**
 
 Design goal:
 
@@ -17,63 +17,85 @@ Design goal:
 When CBP is intentionally invoked:
 
 - one coordinator;
-- **one builder by default**;
-- **one fresh final verifier**;
-- more agents only for genuinely independent work or a named high-risk failure mode.
+- one **active writer** at a time in shared workspace;
+- one bounded builder work packet to start, with additional sequential builders only when useful;
+- one genuinely independent final verifier with no inherited implementation conversation;
+- extra parallel writers only behind explicit isolation/integration controls.
 
-The coordinator owns intent, contract, orchestration, integration, candidate identity, and final state. It is not the default implementation worker and cannot replace independent verification.
+The coordinator owns intent, contract, orchestration, integration, candidate identity, and final state. It is not the implementation monolith and cannot replace independent verification.
 
 Small local low-risk edits should use the harness's normal workflow instead.
 
-## What v3 protects
+## Key properties
 
-- runtime/model routing is checked before implementation;
-- child artifact semantics are explicit: shared workspace vs isolated returned artifact;
-- contract freezes before the first tracked edit/builder launch;
-- one writer at a time is the safe shared-workspace default;
+- runtime/model/context routing is checked before implementation;
+- shared workspace vs isolated returned artifact is explicit;
+- verifier independence means **new child + no inherited parent conversation**;
+- required/protected behavior freezes before candidate-affecting implementation;
+- debugging may refine the verification technique without weakening the frozen requirement;
 - builder cannot self-accept;
-- candidate identity is independently attested by the verifier before **and after** testing;
-- uncommitted candidates have a canonical tracked-patch + untracked-file fingerprint;
-- plan/control metadata is separated from verified source;
-- repeated verification/remediation has a global circuit breaker;
-- stateful/irreversible failures enter recovery/re-baseline rather than blindly retrying;
-- external destructive/production actions still require authorization.
+- **attested artifact == tested artifact**;
+- verifier attests candidate identity before and after testing;
+- commit SHA is the normal candidate identity;
+- uncommitted fallback uses bundled deterministic `scripts/candidate_id.py`, not hand-built hashing;
+- builder runs focused tests, coordinator only integration-specific checks, verifier owns acceptance/regression proof;
+- understood verifier findings are batched into coherent remediation passes;
+- loop control is based on **lack of progress**, not raw verifier-failure count;
+- stateful/irreversible failures enter recovery/re-baseline before normal remediation;
+- coordinator performs one cheap final identity check before `DONE`;
+- external destructive/production actions require authorization.
 
 ## Model routing
 
 ### DeepSeek Harness
 
-- Builder: actual execution subagent route configured by DSH; intended setup currently resolves to MiniMax.
-- Verifier: a separately configured **GPT-5.6 Luna** route.
-- CBP preflights the real routes/model resolution before implementation. If Luna verification cannot be confirmed, the run is `BLOCKED` before build rather than silently using the builder route.
+- Builder: actual execution route configured by DSH; intended setup currently resolves to MiniMax.
+- Verifier: separately configured **GPT-5.6 Luna** route.
+- Final verifier route must create a new child **without inheriting coordinator/builder conversation**. A fork-style inherited-context route is not sufficient.
+- If required Luna routing or clean-context verification cannot be confirmed, CBP blocks before implementation.
 
 ### Codex
 
 - Builders: coordinator chooses for coding fit/complexity, preferring **GPT-5.6 Luna** when suitable.
-- Final verifier: Luna preferred; strongest fresh independent fallback allowed if Luna is unavailable and the deviation is recorded.
+- Final verifier: Luna preferred; strongest suitable clean-context independent fallback allowed when Luna is unavailable and the deviation is recorded.
+
+## Candidate identity
+
+Preferred:
+
+```text
+exact local commit SHA
+```
+
+When the candidate must remain uncommitted:
+
+```text
+python3 <skill-root>/scripts/candidate_id.py create --exclude .cbp/PLAN.md
+```
+
+The verifier recomputes the same identity with the helper. The helper includes tracked binary diff plus untracked path/type/Git-mode/content semantics.
 
 ## Workspace/artifact modes
 
-Every run records one:
-
-- `SHARED_WORKSPACE` — builder edits the coordinator-visible workspace; one active writer at a time.
+- `SHARED_WORKSPACE` — builder edits the coordinator-visible workspace; one active write-capable child at a time.
 - `ISOLATED_ARTIFACT` — builder returns an exact commit/patch/artifact which the coordinator integrates before candidate freeze.
 
 ## Rigor
 
-- **Standard** — default: one builder + one final verifier.
-- **High Assurance** — only for security/auth boundaries, financial/trading logic, destructive/stateful migration, sensitive production data, safety-critical behavior, or unusually costly failure. Adds only risk-justified critique/boundary verification and stateful recovery rules where relevant.
+- **Standard** — lean default flow above.
+- **High Assurance** — only for security/auth boundaries, financial/trading logic, destructive/stateful migration, sensitive production data, safety-critical behavior, or unusually costly failure. Add only controls justified by a named risk.
 
 ## Files
 
-- `SKILL.md` — normative workflow and invariants.
+- `SKILL.md` — normative five-stage workflow.
 - `agents/openai.yaml` — Codex metadata; explicit invocation by default.
-- `assets/EXEC_PLAN_TEMPLATE.md` — lean durable state template.
-- `references/RUNTIMES.md` — preflight, Codex/DSH routing, workspace semantics.
-- `references/PLANS.md` — lean state model, candidate fingerprint, resume rules.
-- `references/BUILDER_HANDOFF.md` — builder assignment contract.
-- `references/VERIFIER_HANDOFF.md` — independent candidate attestation and acceptance proof.
-- `references/STATEFUL.md` — High-Assurance external-state/recovery protocol.
+- `assets/EXEC_PLAN_TEMPLATE.md` — lean durable state.
+- `scripts/candidate_id.py` — deterministic uncommitted candidate identity helper.
+- `references/RUNTIMES.md` — runtime/model/context preflight + artifact semantics.
+- `references/PLANS.md` — lean state, identity usage, progress/resume rules.
+- `references/BUILDER_HANDOFF.md` — bounded builder work packet.
+- `references/VERIFIER_HANDOFF.md` — clean-context exact-artifact acceptance proof.
+- `references/STATEFUL.md` — external-state identity/recovery.
 - `references/EXAMPLE.md` — minimal end-to-end example.
 - `references/verifier.example.toml` — optional Codex Luna verifier configuration.
 
@@ -91,4 +113,4 @@ Explicit Codex invocation:
 $contract-build-prove
 ```
 
-Implicit Codex invocation is disabled intentionally because CBP always launches subagents and should be chosen for substantial work, not accidentally applied to routine edits.
+Implicit Codex invocation is intentionally disabled because CBP always launches subagents and should be chosen for substantial work rather than applied accidentally to routine edits.
