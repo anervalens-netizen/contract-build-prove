@@ -1,45 +1,54 @@
-# Builder subagent handoff
+# Builder handoff
 
-Use this template for meaningful delegated implementation work. Keep each assignment self-contained and small enough that one child agent can own it end to end.
+Use one builder by default. Keep the assignment standalone and outcome-oriented.
 
 ```text
-You are a builder subagent. Implement only the scoped work below. You may inspect surrounding code needed to understand the task, but do not expand scope silently.
+You are the implementation builder for one Contract-Build-Prove workstream.
 
 OBJECTIVE:
 [small concrete outcome]
 
-OWNED SCOPE:
-[files/components/symbols this builder may change]
-
 RELEVANT ACCEPTANCE CRITERIA:
-[AC IDs + observable behavior]
+[IDs + required observable behavior]
 
-PROTECTED BEHAVIOR / NON-GOALS:
+OWNED OUTCOME / LIKELY AREA:
+[what you own; likely components/symbols]
+
+EXCLUSIONS / PROTECTED BEHAVIOR:
 [what must not change]
 
-BASELINE / DEPENDENCIES:
-[relevant SHA/state/prerequisites]
+BASELINE:
+[relevant HEAD/state/prerequisites]
 
-EXPECTED VERIFICATION:
-[tests/probes the builder should run locally]
+WORKSPACE MODE:
+[SHARED_WORKSPACE | ISOLATED_ARTIFACT]
 
-SIDE-EFFECT BOUNDARIES:
-[no push/deploy/prod mutation/etc. unless explicitly authorized]
+ARTIFACT RETURN:
+[shared workspace status/diff OR exact commit/patch expected]
 
-Do the smallest defensible implementation. Preserve unrelated work. Do not declare acceptance criteria independently PASS; report only what you changed and directly observed.
+EXPECTED CHECKS:
+[focused tests/probes]
+
+SIDE-EFFECT LIMITS:
+[no push/deploy/prod/destructive action unless explicitly authorized]
+
+Implement the smallest defensible change. Inspect surrounding code as needed. For debugging, follow evidence even if the likely area changes, but report material scope expansion instead of silently taking unrelated work.
+
+Do not declare acceptance criteria PASS. Report only implementation and observations.
 
 Return:
+ARTIFACT: exact commit/patch or SHARED_WORKSPACE
 CHANGES: concise summary + paths
 CHECKS: exact commands/probes + results
-BLOCKERS: concrete blockers or NONE
-RISKS: remaining uncertainty/regression risk or NONE
-HANDOFF: anything the coordinator must integrate or verify
+BLOCKERS: NONE or concrete blocker
+RISKS: NONE or remaining uncertainty
 ```
 
-## Delegation rules
+## Rules
 
-- One owner per tightly coupled change set.
-- Parallel builders must not contend for the same files/state unless the coordinator explicitly manages the merge risk.
-- A builder may discover adjacent defects but should report them instead of opportunistically expanding scope.
-- If the requested task cannot be completed inside the assigned scope, report the dependency/blocker rather than silently changing the contract.
-- Builder self-tests are evidence inputs, not independent acceptance.
+- One writer owns a tightly coupled change set end to end.
+- In `SHARED_WORKSPACE`, only one write-capable builder runs at a time.
+- Strict file ownership is required only when parallel isolated workstreams need collision control; do not use fake file certainty for root-cause debugging.
+- In `ISOLATED_ARTIFACT`, returning an exact integratable artifact is mandatory. A prose summary is not integration.
+- Adjacent defects are reported rather than opportunistically absorbed unless they are necessary to satisfy the frozen contract.
+- Builder checks are evidence inputs, not independent acceptance.
