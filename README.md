@@ -20,7 +20,7 @@ Every normal run has:
 - at least one execution/builder subagent;
 - one separate fresh verifier subagent.
 
-The coordinator owns the contract, plan, decomposition, integration, candidate identity, and final state. It should not simply implement the whole task itself. Builders execute bounded work. Verifiers independently decide whether the integrated candidate actually satisfies the frozen acceptance contract.
+The coordinator owns the contract, plan, decomposition, integration, candidate identity, and final state. It should not implement the substantial task monolithically. Builders execute bounded work. Verifiers independently decide whether the integrated candidate satisfies the frozen acceptance contract.
 
 Small local low-risk edits should use the harness's normal workflow instead of this skill.
 
@@ -34,16 +34,14 @@ Small local low-risk edits should use the harness's normal workflow instead of t
 ### DeepSeek Harness
 
 - **Builder/execution:** use the execution subagent provider/model already configured by DSH. In the intended setup this is MiniMax; the skill does not hardcode the concrete MiniMax version.
-- **Verifier:** use a fresh **GPT-5.6 Luna** subagent for independent acceptance verification.
+- **Verifier:** use a fresh **GPT-5.6 Luna** subagent. In this DSH setup Luna is required for the verifier role; if that route is unavailable, verification is `BLOCKED` rather than silently substituted.
 
 This lets DSH own provider/model configuration while CBP owns the orchestration contract.
 
 ### Codex
 
 - **Builders:** coordinator chooses subagents according to complexity and specialization, with **GPT-5.6 Luna preferred** when suitable.
-- **Verifier:** **GPT-5.6 Luna is the preferred final verifier**. Use a fresh verifier context that did not implement the candidate.
-
-If Luna is unavailable, the strongest available independent verifier may be used, but the deviation should be recorded.
+- **Verifier:** **GPT-5.6 Luna is the preferred final verifier**. If unavailable, Codex may use the strongest available fresh independent verifier and record the deviation.
 
 ## Files
 
@@ -53,9 +51,9 @@ If Luna is unavailable, the strongest available independent verifier may be used
 - `references/RUNTIMES.md` — Codex/DSH/generic role and model routing.
 - `references/PLANS.md` — state model, evidence, drift, candidate identity, resume rules.
 - `references/BUILDER_HANDOFF.md` — standalone implementation-subagent handoff.
-- `references/AUDITOR_HANDOFF.md` — fresh-verifier handoff and verdict semantics.
+- `references/VERIFIER_HANDOFF.md` — fresh-verifier handoff and verdict semantics.
 - `references/EXAMPLE.md` — minimal FAIL → remediation → PASS example.
-- `references/auditor.example.toml` — optional Codex custom auditor example.
+- `references/verifier.example.toml` — optional Codex custom verifier example pinned to GPT-5.6 Luna.
 
 ## Install in a repository
 
@@ -65,7 +63,7 @@ Use:
 .agents/skills/contract-build-prove/
 ```
 
-The same repository location can be used by Codex and DSH.
+The same repository location is usable by Codex and discoverable by DSH.
 
 Explicit Codex invocation:
 
