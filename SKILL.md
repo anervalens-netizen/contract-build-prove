@@ -5,116 +5,107 @@ description: Orchestrate substantial repository work with mandatory builder and 
 
 # Contract-Build-Prove
 
+Protocol version: **5**
+
 **Preflight → Contract → Build → Candidate → Prove**
 
 Make false completion difficult without making process the main job.
 
-If CBP is active, subagents are mandatory. Start with **one bounded builder work packet + one independent final verifier**. Use additional sequential builders when useful; parallel writers require isolation.
+If CBP is active, subagents are mandatory. Prefer **one coherent end-to-end builder + one independent final verifier** when one child can reliably own the change. Add sequential builders only when useful; parallel writers require isolation.
 
 `SKILL.md` is normative. References operationalize it.
 
 ## Invariants
 
 1. **Coordinator orchestrates.** Behavioral implementation goes to builders; coordinator edits are mechanical integration only.
-2. **One active shared writer.** Never keep multiple write-capable children active in one shared workspace.
+2. **One shared writer total.** At most one writer may touch a shared workspace, including coordinator and descendants. Nested writers must be isolated.
 3. **Builder cannot accept itself.** Builder checks are evidence only.
-4. **Verifier is genuinely independent.** Every attempt uses a new child that did not implement the candidate and does **not** inherit coordinator/builder conversation.
-5. **Behavior freezes before implementation.** Required behavior, protected behavior, and evidence strength freeze before the first candidate-affecting edit or implementation-builder launch.
-6. **Attested artifact = tested artifact.** Verifier attests the artifact it tests, tests that same artifact, then re-attests it.
-7. **Protect work/state.** Never overwrite user/newer/unrelated work; external destructive/production actions require explicit authorization or repository policy.
+4. **Verifier is independent.** Every attempt uses a new child that did not implement the candidate and does **not** inherit coordinator/builder conversation.
+5. **Freeze what must be proven.** Required/protected behavior freezes before the first candidate-affecting edit or builder launch. Verification method may change only if the new proof is at least as convincing.
+6. **Attested artifact = tested artifact.** Attest → test that artifact → re-attest.
+7. **Protect work and side effects.** Never overwrite user/newer/unrelated work. No push, merge, deploy, publish/release, production mutation, destructive, paid, or irreversible external action without explicit user or repository authorization.
 
 ## 0. Preflight
 
-Read the common preflight plus only the active harness section in `references/RUNTIMES.md`.
+Read common preflight + only the active harness section in `references/RUNTIMES.md`.
 
-Record in the lean plan:
+Reuse a prevalidated **trusted runtime profile** when available; confirm its routes/capabilities are still available instead of rediscovering harness semantics. Otherwise establish `AD_HOC` once.
 
-- actual builder/verifier routes and active verifier policy;
-- verifier new child = `YES`;
-- verifier inherits parent conversation = `NO`;
-- `SHARED_WORKSPACE` or `ISOLATED_ARTIFACT`;
-- plan location is visible to the next expected coordinator session.
+Record: runtime profile, actual builder/verifier routes/policy, verifier new child=`YES`, inherits parent conversation=`NO`, workspace mode, and a plan location visible to the next coordinator session.
 
-Do not infer model routing, context isolation, or artifact transport from prompt wording/role names. If required capability cannot be established, `BLOCKED` before implementation.
+Do not infer routing, context isolation, or artifact transport from names/prompts. Missing required capability → `BLOCKED` before build.
 
-Create/reuse one small durable plan from `assets/EXEC_PLAN_TEMPLATE.md`; use `references/PLANS.md`.
+Create/reuse one lean durable plan from `assets/EXEC_PLAN_TEMPLATE.md`; see `references/PLANS.md`.
 
 ## 1. Contract
 
-Record only the safety baseline needed: repository instructions, branch/HEAD, protected working-tree changes, and relevant runtime/external state.
+Record only the safety baseline: repository instructions, branch/HEAD, protected working-tree changes, relevant runtime/external state.
 
-For unknown-root-cause debugging, investigate first. Read-only exploration is preferred. Pre-freeze tracked diagnostic edits are allowed only in a disposable investigation workspace that cannot become the candidate; otherwise freeze first.
+For unknown-root-cause debugging, investigate first. Pre-freeze tracked diagnostics are allowed only in a disposable investigation workspace that cannot become the candidate; otherwise freeze first.
 
-Acceptance criteria define required observable behavior, protected behavior/non-goals, and a verification approach. Reproduce bugs before fixing when reasonably possible.
+Acceptance criteria define required behavior, protected behavior/non-goals, and how each result can be proven. Reproduce bugs before fixing when reasonably possible.
 
-Freeze required/protected behavior and evidence strength immediately before the first candidate-affecting edit or implementation-builder launch. Weakening them later requires `OLD / NEW / REASON / IMPACT` plus explicit user authorization.
+Freeze required/protected behavior immediately before the first candidate-affecting edit or builder launch. Weakening it later requires `OLD / NEW / REASON / IMPACT` + explicit user authorization. A proof method may change without amendment only if it is at least as convincing and the frozen requirement is unchanged.
 
-Verification technique may be refined without amendment when equivalent or stronger and the frozen requirement is unchanged.
-
-For investigation, two consecutive cycles with no fault-domain narrowing or new discriminating evidence require a fresh synthesis/replan before another hypothesis.
+Two consecutive investigation cycles with no fault-domain narrowing or new discriminating evidence require synthesis/replan before another hypothesis.
 
 ## 2. Build
 
 Use `references/BUILDER_HANDOFF.md`.
 
-- Start with one bounded builder work packet.
-- Use another **sequential** builder when remaining work is materially different or too broad for one reliable handoff.
-- Shared workspace: one write-capable child at a time.
-- Parallel writers: isolated artifacts/worktrees or explicit safe integration controls only.
-- Debugging scope: owned outcome + likely area + exclusions.
+- Prefer one end-to-end builder for one coherent change. **Do not split merely by files or layers.**
+- Add a sequential builder when remaining work is materially different or too broad for one reliable handoff.
+- `SHARED_WORKSPACE`: one writer total; builders may not spawn nested shared writers.
+- Parallel writers require isolation + explicit integration.
+- Unexpected overlapping drift before/after a shared builder packet must be reconciled; prefer isolated artifacts when concurrent human/process edits are likely.
 
-Artifact transport must be explicit: shared builder diff is inspected directly; isolated builder work must return an exact integratable artifact. A prose summary is never integration.
+A prose summary is never integration.
 
-Test ownership: builder runs focused development checks; coordinator runs only integration-specific checks when needed; verifier owns acceptance/regression proof. Candidate-bound immutable CI evidence may replace an expensive rerun when it fully proves the criterion.
+Test ownership: builder = focused development checks; coordinator = integration-only checks when needed; verifier = acceptance/regression authority. Candidate-bound immutable CI evidence may replace an expensive rerun when it fully proves the criterion.
 
 ## 3. Candidate
 
-Before final verification, coordinator:
+Before verification: integrate all artifacts, inspect real diff/status, preserve protected work, stop all shared writers, create exact candidate identity, freeze source.
 
-1. confirms all builder artifacts are integrated;
-2. inspects real diff/status and protected work;
-3. confirms no shared write-capable child remains active;
-4. creates exact candidate identity;
-5. freezes verified source.
+Use an exact local commit SHA whenever permitted. **Default commit verification = clean isolated worktree/snapshot materialized from that exact SHA.** Testing the current workspace instead requires proving no candidate-affecting tracked/untracked differences from the SHA except declared control state.
 
-Use an exact local commit SHA whenever permitted. If work must remain uncommitted, use bundled `scripts/candidate_id.py`; do not recreate its fingerprint manually. See `references/PLANS.md`.
+Unrelated pre-existing user/newer work must not become an implicit dependency. Isolate CBP-owned work, or explicitly record the pre-existing change as an authorized baseline dependency; otherwise `BLOCKED`. Never hide protected source by excluding it from identity.
 
-ExecPlan/control state is not verified source. Source/config/test changes after freeze create a new candidate.
+If uncommitted, use bundled `scripts/candidate_id.py`; unsupported worktree state means use a commit/isolated artifact or block. Do not recreate its fingerprint manually. See `references/PLANS.md`.
 
-For persistent external-state work, candidate identity also includes the applicable tuple from `references/STATEFUL.md`.
+Control state is not verified source. Persistent external-state work also uses `references/STATEFUL.md`.
 
 ## 4. Prove
 
-Use `references/VERIFIER_HANDOFF.md` and a **new clean-context verifier child for every attempt**.
+Use `references/VERIFIER_HANDOFF.md` and a **new clean-context verifier** for every attempt.
 
-Verifier must attest the artifact it will test, prove every criterion, verify any stateful target, then re-attest the **same tested artifact**. If using a writable snapshot/worktree, attest/test/re-attest that snapshot itself—not the parent workspace.
+First, verifier compares objective/protected behavior with the frozen contract. A clearly missing objective-essential requirement → `BLOCKED: CONTRACT_COVERAGE_GAP`; do not invent requirements.
 
-On `FAIL`:
+Then attest the exact artifact to test, prove every criterion/state target, and re-attest the same artifact. Candidate-authored tests count only after the verifier confirms they actually exercise/assert the frozen behavior.
 
-1. if `RECOVERY_REQUIRED=YES` or external state is ambiguous, run `references/STATEFUL.md` recovery first;
-2. otherwise remediate all concrete understood findings that safely fit one coherent builder pass; `LARGEST_GAP` is priority, not a one-finding limit;
-3. integrate → new candidate → new clean-context verifier.
+On `FAIL`: stateful recovery first when required; otherwise batch all concrete understood findings that safely fit one coherent builder pass. Integrate → new candidate → new clean verifier.
 
-Progress breaker: if the same failed surface/blocker survives **two consecutive remediation cycles without material improvement or new discriminating evidence**, perform one fresh root-cause synthesis/replan. One further non-improving cycle ends `PARTIAL` or `BLOCKED`. Do not stop merely because several FAILs occurred while the system is converging.
+If the same failed surface/blocker survives **two consecutive cycles without material improvement or new discriminating evidence**, do one root-cause synthesis/replan. One further non-improving cycle ends `PARTIAL` or `BLOCKED`.
 
 ## High Assurance
 
-Use only for security/auth boundaries, financial/trading logic, destructive/stateful migrations, sensitive production data, safety-critical behavior, or unusually costly failure.
-
-Add only controls justified by a **specific named failure mode**: at most a focused contract critique and/or one critical-boundary verification. For persistent external mutation, read `references/STATEFUL.md` before mutation.
+Use only for security/auth, financial/trading logic, destructive/stateful migrations, sensitive production data, safety-critical behavior, or unusually costly failure. Add only controls justified by a named failure mode. Read `references/STATEFUL.md` before persistent external mutation.
 
 ## DONE
 
-After verifier `PASS`, coordinator performs one cheap final identity check and confirms no shared writer is active. Stateful work also requires `RECOVERY_REQUIRED=NO` and the accepted state target to remain current.
+After verifier `PASS`, coordinator performs one cheap final identity check and confirms no shared writer is active. Stateful work also requires current accepted state and `RECOVERY_REQUIRED=NO`.
 
-Declare `DONE` only when every required criterion is `PASS` for that current candidate, required runtime proof passes, protected work is intact, and no recovery remains. Otherwise report `PARTIAL` or `BLOCKED` with the next safe action.
+`DONE` only when every required criterion is `PASS`, required runtime proof passes, protected work is intact, and no recovery remains.
+
+`PARTIAL` = some requested outcome is proven, but not all required criteria are complete.  
+`BLOCKED` = no safe progress is possible without missing access, capability, authorization, decision, isolation, or recovery.
 
 ## References
 
-- `references/RUNTIMES.md` — runtime/model/context preflight + artifact mode.
-- `references/PLANS.md` — lean state + candidate helper + resume.
-- `references/BUILDER_HANDOFF.md` — builder work packet.
-- `references/VERIFIER_HANDOFF.md` — clean-context exact-artifact proof.
-- `references/STATEFUL.md` — external-state identity/recovery.
+- `references/RUNTIMES.md` — runtime profiles + preflight.
+- `references/PLANS.md` — lean state + candidate helper + resume/version rules.
+- `references/BUILDER_HANDOFF.md` — builder packet.
+- `references/VERIFIER_HANDOFF.md` — coverage + exact-artifact proof.
+- `references/STATEFUL.md` — external-state recovery.
 - `references/EXAMPLE.md` — minimal example.
 - `references/verifier.example.toml` — optional Codex verifier.
