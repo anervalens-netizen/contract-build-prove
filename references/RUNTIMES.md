@@ -1,58 +1,82 @@
 # Runtime adapters
 
-Contract-Build-Prove defines one orchestration pattern across harnesses:
+Contract-Build-Prove uses the same roles everywhere:
 
-**Coordinator → builder subagent(s) → integration → frozen candidate → fresh verifier subagent → remediation or close**
+**Coordinator → builder → integrated candidate → fresh verifier**
 
-If the harness cannot provide both execution and verification subagents, a full CBP run is unavailable and must report `BLOCKED` rather than silently degrading to single-agent execution.
+The runtime adapter must make those roles operational before implementation starts.
 
-## Required capability model
+## Mandatory preflight
 
-Every CBP run requires:
+Record:
 
-1. a primary coordinator context;
-2. at least one fresh child agent/context capable of bounded implementation;
-3. a separate fresh child agent/context that did not implement the candidate and can independently verify it;
-4. repository/file execution access sufficient to inspect and test the candidate.
+```text
+HARNESS=<Codex | DSH | other>
+BUILDER_ROUTE=<actual tool/role/preset>
+BUILDER_MODEL=<resolved model if observable>
+VERIFIER_ROUTE=<actual tool/role/preset>
+VERIFIER_MODEL=<resolved model if observable>
+FRESH_CONTEXT_SUPPORTED=<YES|NO>
+WORKSPACE_MODE=<SHARED_WORKSPACE|ISOLATED_ARTIFACT>
+RESULT=<READY|BLOCKED>
+```
 
-The coordinator may perform small integration glue or conflict resolution, but should not absorb the builder role simply because it is convenient.
+A prompt saying "use model X" is not proof that the runtime routed model X. Confirm routing from harness-exposed configuration/metadata or another reliable runtime signal. If a required verifier model cannot be confirmed, block before implementation rather than discovering the problem at the end.
 
-## Model routing principles
+## Workspace/artifact semantics
 
-- Verification quality has priority over cost.
-- Builder model choice may optimize for coding fit, speed, context, and cost, provided the coordinator preserves the contract and independent-verification boundary.
-- A verifier must not be the same child session/context as any builder. Freshness matters even if the same model family is used.
-- Runtime-specific routing below overrides generic preferences.
+Never assume child edits automatically appear in the coordinator workspace.
+
+### SHARED_WORKSPACE
+
+The child writes the same workspace the coordinator can inspect.
+
+Rules:
+- one active write-capable builder at a time;
+- coordinator inspects actual diff/status after return;
+- verifier attests the final integrated candidate, not the builder session.
+
+### ISOLATED_ARTIFACT
+
+The child works in an isolated branch/worktree/process/workspace.
+
+Rules:
+- builder must return an exact commit, patch, or other deterministic artifact;
+- coordinator explicitly integrates it;
+- coordinator inspects the resulting integrated diff;
+- only the integrated result may become the candidate.
+
+Parallel writers are allowed only when isolation/integration makes collisions controllable.
 
 ## OpenAI Codex
 
 ### Coordinator
-The current Codex agent/thread running this skill.
+The current Codex agent/thread running the skill.
 
-### Builders
-The coordinator chooses builder subagent model/role according to task complexity and specialization.
+### Builder
+Standard CBP normally starts with one builder. Choose according to task complexity/specialization.
 
 Preference:
+1. GPT-5.6 Luna when available and suitable;
+2. another strong coding-capable subagent when there is a concrete reason;
+3. a repository-specific custom builder when configured.
 
-1. **GPT-5.6 Luna** when available and suitable;
-2. another strong coding-capable subagent when the coordinator has a concrete reason to prefer it for that task;
-3. a project-specific custom builder when repository configuration defines one.
-
-Use `explorer` only for read-heavy discovery. Exploration does not replace the mandatory implementation builder.
+Use `explorer` for read-only discovery. Explorer work does not replace the mandatory implementation builder.
 
 ### Verifier
-Prefer **GPT-5.6 Luna** for final verification.
+Prefer GPT-5.6 Luna.
 
-Role selection when supported:
+Selection:
+1. fresh configured `verifier` on Luna;
+2. fresh configured `reviewer` on Luna;
+3. fresh general-purpose/default child on Luna using `VERIFIER_HANDOFF.md`;
+4. if Luna is unavailable, strongest available fresh independent verifier, with the deviation recorded.
 
-1. fresh configured `verifier` using GPT-5.6 Luna;
-2. fresh configured `reviewer` using GPT-5.6 Luna;
-3. fresh general-purpose/default subagent using GPT-5.6 Luna and `VERIFIER_HANDOFF.md`;
-4. if Luna is unavailable, the strongest available fresh independent verifier, with the deviation recorded in the ExecPlan.
+Every retry after remediation uses a **new verifier child**.
 
-Never reuse a builder session as verifier for the candidate it implemented.
+### Candidate access
 
-For High Assurance, the coordinator may raise reasoning effort or choose a stronger verifier if the runtime policy permits it and the risk justifies the cost.
+Before building, determine whether the chosen child role edits the shared workspace or returns isolated work. Do not infer this from the role name.
 
 ### Skill location
 
@@ -60,51 +84,56 @@ For High Assurance, the coordinator may raise reasoning effort or choose a stron
 .agents/skills/contract-build-prove/
 ```
 
-`agents/openai.yaml` supplies Codex-specific UI/invocation metadata. Optional Codex custom agents live in `.codex/agents/` or `~/.codex/agents/`; they are adapters, not part of the portable workflow itself.
+Optional custom agents live in `.codex/agents/` or `~/.codex/agents/`.
 
 ## DeepSeek Harness (DSH)
 
-### Coordinator
-The current DSH agent/session running the skill. It owns the ExecPlan, contract, decomposition, orchestration, integration, candidate freeze, and final state.
+DSH can expose multiple subagent providers/tool instances. Model/provider selection is configuration-driven; the parent prompt alone should not be treated as routing control.
 
-### Builders
-Use DSH's configured **execution subagent** for implementation work.
+### Intended routing
 
-The DSH/project configuration owns the concrete provider and model. In the intended setup this role is backed by **MiniMax**; CBP deliberately does not hardcode the MiniMax model/version because the harness already knows the configured execution route.
+- **Builder:** use the configured execution route; in the intended setup this resolves to MiniMax. CBP does not hardcode the MiniMax version.
+- **Verifier:** use a separately configured route resolving to **GPT-5.6 Luna**.
 
-Each builder invocation must be a scoped child context with a standalone handoff from `BUILDER_HANDOFF.md`.
+The two routes should be distinguishable before implementation. Example model-facing names are:
 
-### Verifier
-Use a **new GPT-5.6 Luna subagent** for independent verification. In the intended DSH setup this routing is mandatory, not merely preferred.
+```text
+cbp_builder
+cbp_verifier
+```
 
-Required properties:
+Those names are examples only; existing DSH names/presets are valid if the coordinator can identify them reliably.
 
-- DSH provider/model routing resolves the verifier to `gpt-5.6-luna`;
-- invocation is fresh and did not participate in implementation;
-- verifier receives `VERIFIER_HANDOFF.md`, the frozen contract, and exact candidate identity;
-- it directly inspects/tests the integrated candidate;
-- it does not receive the builder's confidence or desired verdict.
+### DSH preflight
 
-If the configured GPT-5.6 Luna verifier route is unavailable, report the verification phase `BLOCKED` rather than silently substituting another DSH model/provider.
+Before contract freeze/build, confirm:
+
+1. the actual execution-subagent tool/preset/provider route;
+2. the actual verifier tool/preset/provider route;
+3. verifier resolves to `gpt-5.6-luna` in the intended setup;
+4. each verifier invocation creates a fresh child context;
+5. workspace semantics for each route (`SHARED_WORKSPACE` vs `ISOLATED_ARTIFACT`).
+
+If the only visible generic subagent route resolves to the builder model, **do not call it a Luna verifier**. Configure/use a distinct verifier route or report CBP `BLOCKED` before implementation.
+
+DSH child providers may run in a separate process while still receiving the parent's cwd, or may use other configured cwd/session behavior. Therefore process separation does not by itself prove workspace isolation; record the effective artifact mode explicitly.
 
 ### Skill location
-
-DSH can discover project skills from:
 
 ```text
 .agents/skills/contract-build-prove/
 ```
 
-No DSH-specific metadata file is required by the portable core. Provider/model routing remains in DSH's own configuration rather than being duplicated inside this skill.
+Provider/model configuration remains harness-owned. CBP only requires that the resolved role can be attested.
 
-## Generic subagent-capable harness
+## Generic harness
 
-Map capabilities by role:
+Full CBP requires:
 
-| CBP role | Runtime requirement |
-|---|---|
-| Coordinator | persistent primary context with repository access |
-| Builder | fresh/scoped child agent capable of implementation and local tests |
-| Verifier | fresh child context that did not implement the candidate and can inspect/test it |
+- a coordinator;
+- a write-capable builder child;
+- a separate fresh verifier child;
+- a known artifact-transport mode;
+- enough repository/runtime access to attest and test the final candidate.
 
-Prefer GPT-5.6 Luna for verifier when exposed by the harness. Builder selection remains coordinator-controlled unless runtime policy defines a dedicated execution role.
+If any required capability cannot be established at preflight, report `BLOCKED` rather than collapsing silently into single-agent execution.
