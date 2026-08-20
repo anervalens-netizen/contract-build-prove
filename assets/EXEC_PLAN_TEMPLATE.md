@@ -1,112 +1,76 @@
-# [TASK-ID] — [Objective]
+# [Objective]
 
-Status: ACTIVE
+Overall: ACTIVE
 Rigor: STANDARD | HIGH_ASSURANCE
-Overall outcome: UNVERIFIED
-Created: [ISO-8601]
-Updated: [ISO-8601]
+Control state path: [this file/path]
 
-## Objective
+## Goal and boundaries
 
-[User-visible result.]
+Goal: [observable user-visible result]
 
-## Non-goals and boundaries
+Must not change:
+- [protected behavior/non-goal]
 
-- [Behavior/component that must not change.]
-- [Authorization, destructive-action, production-data, cost, security, or deployment boundary.]
+Authorization boundaries:
+- [push/merge/deploy/prod/destructive/cost boundary]
+
+## Runtime preflight
+
+- Harness: [Codex | DSH | other]
+- Builder route/model: [actual resolved route/model]
+- Verifier route/model: [actual resolved route/model]
+- Fresh verifier context: YES | NO
+- Workspace mode: SHARED_WORKSPACE | ISOLATED_ARTIFACT
+- Preflight: READY | BLOCKED
 
 ## Baseline
 
-- Repository: [path/name]
 - Branch / HEAD: [branch] / [SHA]
-- Working tree: [clean or exact pre-existing changes]
-- Protected user/newer work: [paths/commits or none]
-- Relevant runtime/deployed state: [SHA/digest/schema/services/health or N/A/UNVERIFIED]
-
-## Minimal code map
-
-- `[path or symbol]` — [responsibility and relevance]
+- Working tree / protected user-newer work: [concise state]
+- Relevant external/runtime state: [only when applicable]
 
 ## Acceptance contract
 
-Contract state: DRAFT | FROZEN
-Frozen at: [ISO-8601 or UNVERIFIED]
+Contract: DRAFT | FROZEN
+Frozen before first tracked edit/builder launch: [timestamp or NO]
 
-| ID | Observable behavior | Protected behavior | Verification + expected result | Runtime proof | Evidence | Status |
-|---|---|---|---|---|---|---|
-| AC-1 | [behavior] | [must not regress] | `[command/probe]` → [expected] | [probe or N/A] | pending | UNVERIFIED |
+| ID | Required behavior | Protected behavior | Verification + expected result | Status / evidence |
+|---|---|---|---|---|
+| AC-1 | [behavior] | [must remain true] | `[probe]` → [expected] | UNVERIFIED |
 
-## Contract amendments
+Amendments: NONE
 
-- None.
+<!-- After freeze: AC-x — OLD / NEW / REASON / IMPACT / AUTHORIZATION -->
 
-<!-- After freeze, each amendment must use:
-- [ISO-8601] AC-x
-  - OLD: ...
-  - NEW: ...
-  - REASON: ...
-  - IMPACT: ...
-  - AUTHORIZATION: [user / clarification / not scope-reducing]
--->
+## Workstreams
 
-## Tasks
-
-| Task | Scope | Depends on | Owner | Attempts | State |
-|---|---|---|---|---:|---|
-| T1 | [atomic deliverable] | none | [builder] | 0 | READY |
-
-## Progress
-
-- [ISO-8601] Baseline recorded. Next: [one concrete action].
-
-## Failures and discoveries
-
-- [Observation → implication.]
-
-## Decisions
-
-- [Decision → why → evidence/constraint.]
+| Workstream | Owner | Artifact mode | State | Blocker |
+|---|---|---|---|---|
+| W1 | [builder] | shared | READY | NONE |
 
 ## Candidate
 
-- Candidate identity: UNVERIFIED
-- Candidate basis: [commit SHA OR HEAD + workspace fingerprint]
-- Frozen for verification: NO
-- Drift check: UNVERIFIED
-- Integrated diff review: UNVERIFIED
-- Relevant regression gates: UNVERIFIED
+- Identity: UNVERIFIED
+- Basis: [commit SHA OR BASE_HEAD + patch/untracked fingerprints]
+- Control-state exclusions: [paths]
+- Builder artifacts integrated: NO
+- Candidate frozen: NO
 
-## Independent verification
+## Last verifier result
 
-- Verifier: UNVERIFIED
-- Model/provider: UNVERIFIED
+- Verifier child/model: UNVERIFIED
+- Candidate attested pre/post: UNVERIFIED
 - Verdict: UNVERIFIED
-- Candidate verified: UNVERIFIED
-- Criteria: UNVERIFIED
-- Largest gap: UNVERIFIED
+- Failed/blocked criteria: NONE | [IDs]
+- Largest gap: NONE | [gap]
+- Evidence: [concise commands/probes + results]
 
-## Evidence index
+## External-state recovery — only if applicable
 
-- AC-1: [command/probe + result + candidate identity + environment/timestamp/URL when useful]
+- State identity: N/A
+- Recovery required: NO
+- Rollback/forward-recovery decision: N/A
 
-## Deployment/runtime
+## Next action
 
-- Authorized: YES | NO | N/A
-- Published SHA/digest: N/A | UNVERIFIED
-- Health/logs/user flow: N/A | UNVERIFIED
-
-## Risks and remaining work
-
-- [Known risk or unverified assumption.]
-
-## Next exact step
-
-[One concrete command/action and expected observation.]
-
-## Resume procedure
-
-1. Read repository instructions and this plan.
-2. Recheck branch, HEAD, working tree, protected work, and relevant runtime state.
-3. Compare current state with `Candidate` and latest progress; record drift before editing.
-4. Preserve newer/user work.
-5. Continue from `Next exact step`; do not repeat a recorded failed approach unchanged.
+[One concrete safe action.]
