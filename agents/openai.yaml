@@ -1,7 +1,7 @@
 interface:
   display_name: "Contract–Build–Prove"
-  short_description: "Contract, build, audit, and prove substantial work"
-  default_prompt: "Use $contract-build-prove to execute this repository task with proportional rigor, a frozen acceptance contract, and independent evidence-backed completion."
+  short_description: "Orchestrate builders, verify independently, prove completion"
+  default_prompt: "Use $contract-build-prove as the coordinator: define a proportional frozen acceptance contract, delegate bounded implementation to subagents when available, integrate the candidate, and require fresh independent verification before declaring completion."
 
 policy:
   allow_implicit_invocation: true
