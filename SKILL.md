@@ -21,10 +21,10 @@ Map roles and preferred models to the active harness using `references/RUNTIMES.
 
 1. **Coordinator orchestrates; subagents execute.** Delegate meaningful implementation to builder subagents. The coordinator may make only small integration glue, conflict-resolution, or orchestration edits that are impractical to delegate.
 2. **Builders never accept themselves.** A builder may test its own work, but it cannot authorize acceptance criteria `PASS`.
-3. **Verification is fresh and independent.** The verifier must run in a fresh child context that did not implement the candidate. Prefer GPT-5.6 Luna for verification when the harness exposes it.
+3. **Verification is fresh and independent.** The verifier must run in a fresh child context that did not implement the candidate. Use the runtime's verifier routing; GPT-5.6 Luna is the preferred verifier in Codex and the required verifier in the intended DSH setup.
 4. **Protect existing work.** Never overwrite user changes, newer work, or unrelated edits.
 5. **Freeze success before building.** Once implementation starts, never silently weaken, remove, or reinterpret an acceptance criterion.
-6. **Audit an exact candidate.** Tie acceptance to an exact commit SHA or deterministic workspace fingerprint. Any audited-source change invalidates the previous verdict.
+6. **Verify an exact candidate.** Tie acceptance to an exact commit SHA or deterministic workspace fingerprint. Any verified-source change invalidates the previous verdict.
 7. **Prove behavior, not edits.** Prefer executable tests and real runtime observations over claims that code "looks correct."
 8. **Respect side-effect boundaries.** Do not push, merge, deploy, mutate production data/schema, delete resources, or perform irreversible external actions unless the user or repository policy explicitly authorizes them.
 
@@ -82,7 +82,7 @@ For High Assurance, require at least one useful negative, boundary, or adversari
 
 **Contract freeze:** the contract freezes when the first implementation edit begins. Later changes require an explicit amendment recording `OLD`, `NEW`, `REASON`, and `IMPACT`. Never reduce the requested user outcome without explicit user authorization. If a blocker forces reduced scope, report `PARTIAL` or `BLOCKED`; do not redefine success.
 
-For High Assurance, launch a fresh verifier/reviewer subagent to critique the draft contract before building. It critiques testability and missing failure cases; it does not implement.
+For High Assurance, launch a fresh verifier subagent to critique the draft contract before building. It critiques testability and missing failure cases; it does not implement.
 
 ## 4. Decompose and launch builder subagents
 
@@ -103,7 +103,7 @@ Use `references/BUILDER_HANDOFF.md` when useful.
 Rules:
 
 - **At least one builder subagent is mandatory for every CBP run.**
-- Use more builders when decomposition creates genuinely independent work packets.
+- Start with the smallest useful team, normally 1–3 builders. Add more only when the work decomposes into clearly independent scopes and coordination overhead remains low.
 - Parallelize only work that does not contend for the same files, state, or sequencing.
 - Keep tightly coupled architecture, database, auth, state-management, financial/trading, and cross-layer invariants under one sequential builder owner unless independence is clear.
 - A builder may inspect and test its own work, but may not declare acceptance criteria independently `PASS`.
@@ -128,13 +128,13 @@ The coordinator:
 
 Builder/local checks are useful evidence but do not authorize acceptance.
 
-Do not change audited source after candidate freeze. Any source change creates a new candidate and requires affected verification again.
+Do not change verified source after candidate freeze. Any source change creates a new candidate and requires affected verification again.
 
 ## 6. Launch the independent verifier subagent
 
 A fresh verifier subagent is mandatory for every CBP run.
 
-Runtime-specific model/provider routing is defined in `references/RUNTIMES.md`. General preference: use **GPT-5.6 Luna** as verifier whenever available.
+Runtime-specific model/provider routing is defined in `references/RUNTIMES.md`.
 
 The verifier must:
 
@@ -148,12 +148,12 @@ Do **not** provide builder confidence, a defense of the implementation, or the d
 
 Default verification pattern:
 
-- **Standard:** one fresh final verifier audits the fully integrated candidate and may authorize multiple criteria in one pass.
+- **Standard:** one fresh final verifier checks the fully integrated candidate and may authorize multiple criteria in one pass.
 - **High Assurance:** optional fresh verifier(s) at critical milestones, plus a fresh final verifier for the integrated candidate.
 
 Do not automatically create one verifier per builder task; intermediate verification is selective, not ceremonial.
 
-Use `references/AUDITOR_HANDOFF.md` for the verifier contract.
+Use `references/VERIFIER_HANDOFF.md` for the verifier contract.
 
 Prefer read-only tracked source for verification. Temporary test/cache writes are acceptable only in an isolated or disposable location when needed. Never let verification mutate production state.
 
@@ -205,6 +205,6 @@ Never store secrets, credentials, private keys, personal data, sensitive product
 - `references/RUNTIMES.md` — Codex, DeepSeek Harness, model/provider, and role mapping.
 - `references/PLANS.md` — ExecPlan lifecycle, state mapping, evidence rules, resume procedure.
 - `references/BUILDER_HANDOFF.md` — standalone implementation-subagent contract.
-- `references/AUDITOR_HANDOFF.md` — fresh verifier handoff and independence rules.
+- `references/VERIFIER_HANDOFF.md` — fresh verifier handoff and independence rules.
 - `references/EXAMPLE.md` — minimal builder → FAIL → remediation → PASS example.
-- `references/auditor.example.toml` — optional Codex custom auditor configuration.
+- `references/verifier.example.toml` — optional Codex custom verifier configuration.
