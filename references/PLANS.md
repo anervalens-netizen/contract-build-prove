@@ -13,16 +13,16 @@ Use this reference for Standard and High-Assurance Contract-Build-Prove work. Th
 
 | Layer | Allowed states | Who changes it |
 |---|---|---|
-| Task | `BACKLOG`, `READY`, `BUILDING`, `VERIFYING`, `PASS`, `BLOCKED` | Primary agent |
-| Acceptance criterion | `UNVERIFIED`, `PASS`, `FAIL`, `BLOCKED` | Primary records; independent auditor authorizes `PASS` in Standard/High Assurance |
-| Audit | `PASS`, `FAIL`, `BLOCKED` | Independent auditor |
-| Overall outcome | `UNVERIFIED`, `DONE`, `PARTIAL`, `BLOCKED` | Primary agent from recorded evidence |
+| Task | `BACKLOG`, `READY`, `BUILDING`, `VERIFYING`, `PASS`, `BLOCKED` | Coordinator |
+| Acceptance criterion | `UNVERIFIED`, `PASS`, `FAIL`, `BLOCKED` | Coordinator records; fresh verifier authorizes `PASS` |
+| Verification | `PASS`, `FAIL`, `BLOCKED` | Fresh verifier |
+| Overall outcome | `UNVERIFIED`, `DONE`, `PARTIAL`, `BLOCKED` | Coordinator from recorded evidence |
 
 Rules:
 
 - A task may be `PASS` because its implementation work is complete while one or more acceptance criteria remain `UNVERIFIED`; this does not make the overall outcome `DONE`.
-- Audit `FAIL` returns affected tasks to `BUILDING` and increments attempts.
-- Audit `BLOCKED` means the auditor could not establish truth because required access/evidence is unavailable; it is not a passing result.
+- Verification `FAIL` returns affected tasks to `BUILDING` and increments attempts.
+- Verification `BLOCKED` means the verifier could not establish truth because required access/evidence is unavailable; it is not a passing result.
 - `DONE` requires the current candidate—not an earlier one—to satisfy every required criterion.
 
 ## Baseline
@@ -41,7 +41,7 @@ Treat inaccessible state as `UNVERIFIED`, never as healthy or unchanged.
 ## Contract lifecycle
 
 1. Draft falsifiable criteria before implementation.
-2. For High Assurance, independently critique critical criteria for testability and missing failure cases.
+2. For High Assurance, use a fresh verifier to critique critical criteria for testability and missing failure cases.
 3. Freeze the contract at the first implementation edit.
 4. After freeze, record amendments as `OLD / NEW / REASON / IMPACT`.
 5. A scope reduction or weaker requested outcome requires explicit user authorization. Without it, retain the original criterion and report the limitation as `PARTIAL` or `BLOCKED`.
@@ -69,9 +69,9 @@ Do not paste bulky output into the plan. Store a sanitized artifact or durable l
 
 Preferred: exact commit SHA.
 
-When work must remain uncommitted, record exact HEAD plus a deterministic fingerprint covering the relevant candidate changes. The method can be repository-specific, but it must change when audited source changes.
+When work must remain uncommitted, record exact HEAD plus a deterministic fingerprint covering the relevant candidate changes. The method can be repository-specific, but it must change when verified source changes.
 
-Once final audit begins, consider the candidate frozen. Any source edit after that invalidates prior acceptance and requires a new candidate identity, affected verification, and a new final audit.
+Once final verification begins, consider the candidate frozen. Any source edit after that invalidates prior acceptance and requires a new candidate identity, affected checks, and a new final verification.
 
 ## Drift checks
 
@@ -80,9 +80,9 @@ Recheck repository state:
 - when resuming;
 - before integrating delegated work;
 - before freezing the candidate;
-- immediately before final audit.
+- immediately before final verification.
 
-If drift is unrelated, preserve it and continue. If it overlaps owned scope or invalidates baseline assumptions, update the plan and re-evaluate before editing or auditing.
+If drift is unrelated, preserve it and continue. If it overlaps owned scope or invalidates baseline assumptions, update the plan and re-evaluate before editing or verifying.
 
 ## Stagnation
 
