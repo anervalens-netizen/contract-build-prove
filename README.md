@@ -2,54 +2,58 @@
 
 A multi-harness skill for substantial repository work where "the code changed" is not enough evidence that the task is complete.
 
-It is designed for **Codex, DeepSeek Harness (DSH), and other skill/subagent-capable agent harnesses**.
+Designed for **Codex, DeepSeek Harness (DSH), and compatible subagent-capable harnesses**.
 
 Core architecture:
 
-**Coordinator → Builder subagents → Integration → Frozen candidate → Independent verifier subagent → Remediate or close**
+**Coordinator → Builder subagent(s) → Integration → Frozen candidate → Fresh verifier subagent → Remediate or close**
 
 The design goal is **minimum process that makes false completion difficult**.
 
-## Agent roles
+## The rule that matters most
 
-### Coordinator
-Owns the user objective, acceptance contract, decomposition, plan, protected work, integration, candidate identity, and final state. It should not become the default implementation worker for substantial tasks.
+If Contract-Build-Prove is active, **subagents are mandatory**.
 
-### Builder subagents
-Receive small standalone work packets, implement them, run local checks, and return evidence/blockers. They do not authorize their own acceptance.
+Every normal run has:
 
-### Verifier subagents
-Start in a fresh context, did not implement the candidate, inspect the real integrated artifact, and return `PASS | FAIL | BLOCKED` against the frozen contract.
+- one coordinator;
+- at least one execution/builder subagent;
+- one separate fresh verifier subagent.
 
-For **Standard CBP**, normally use one final verifier for the integrated candidate rather than one verifier per builder. For **High Assurance**, add intermediate independent verification only at critical boundaries where the extra cost materially reduces risk.
+The coordinator owns the contract, plan, decomposition, integration, candidate identity, and final state. It should not simply implement the whole task itself. Builders execute bounded work. Verifiers independently decide whether the integrated candidate actually satisfies the frozen acceptance contract.
+
+Small local low-risk edits should use the harness's normal workflow instead of this skill.
 
 ## Rigor levels
 
-- **Fast** — local/reversible/low-risk work; normal workflow; subagents optional.
-- **Standard CBP** — coordinator + ExecPlan + frozen contract + delegated builders when available + one final independent verifier.
-- **High Assurance** — Standard plus contract critique, stronger negative/boundary proof, and selective intermediate verification.
+- **Standard CBP** — coordinator + persistent ExecPlan + frozen contract + builder subagent(s) + one final independent verifier.
+- **High Assurance** — Standard plus contract critique, stronger negative/boundary proof, and selective intermediate independent verification for high-impact boundaries.
 
-## Runtime support
+## Model routing
 
-### OpenAI Codex
-Uses the same `SKILL.md`. `agents/openai.yaml` provides Codex-specific UI/invocation metadata. Builder and verifier roles map to Codex subagents; optional custom auditors can live under `.codex/agents/` or `~/.codex/agents/`.
+### DeepSeek Harness
 
-### DeepSeek Harness (DSH)
-DSH supports skills and a subagent capability. A project may discover this skill from `.agents/skills/contract-build-prove/`, so the same repository installation can be shared with Codex. The coordinator delegates builder and verifier tasks through DSH's configured subagent provider(s).
+- **Builder/execution:** use the execution subagent provider/model already configured by DSH. In the intended setup this is MiniMax; the skill does not hardcode the concrete MiniMax version.
+- **Verifier:** use a fresh **GPT-5.6 Luna** subagent for independent acceptance verification.
 
-DSH is currently a developer preview and its APIs/configuration may change; therefore the core skill avoids hardcoding DSH provider names or plugin configuration. Runtime mapping lives in `references/RUNTIMES.md`.
+This lets DSH own provider/model configuration while CBP owns the orchestration contract.
 
-### Other harnesses
-If the harness can load `SKILL.md`-style instructions and launch independent child agents/contexts, map its capabilities to the same three roles. If it cannot provide independent verification, Standard/High-Assurance completion must not pretend that independence exists.
+### Codex
+
+- **Builders:** coordinator chooses subagents according to complexity and specialization, with **GPT-5.6 Luna preferred** when suitable.
+- **Verifier:** **GPT-5.6 Luna is the preferred final verifier**. Use a fresh verifier context that did not implement the candidate.
+
+If Luna is unavailable, the strongest available independent verifier may be used, but the deviation should be recorded.
 
 ## Files
 
-- `SKILL.md` — compact, runtime-neutral critical workflow.
-- `agents/openai.yaml` — Codex-specific UI metadata and invocation policy; harmless/optional outside Codex.
+- `SKILL.md` — compact critical workflow and invariants.
+- `agents/openai.yaml` — Codex-specific UI/invocation metadata.
 - `assets/EXEC_PLAN_TEMPLATE.md` — persistent plan template.
-- `references/RUNTIMES.md` — Codex/DSH/generic role mapping.
+- `references/RUNTIMES.md` — Codex/DSH/generic role and model routing.
 - `references/PLANS.md` — state model, evidence, drift, candidate identity, resume rules.
-- `references/AUDITOR_HANDOFF.md` — generic fresh-verifier prompt and verdict semantics.
+- `references/BUILDER_HANDOFF.md` — standalone implementation-subagent handoff.
+- `references/AUDITOR_HANDOFF.md` — fresh-verifier handoff and verdict semantics.
 - `references/EXAMPLE.md` — minimal FAIL → remediation → PASS example.
 - `references/auditor.example.toml` — optional Codex custom auditor example.
 
@@ -61,7 +65,7 @@ Use:
 .agents/skills/contract-build-prove/
 ```
 
-This location is compatible with Codex and is also discoverable by DeepSeek Harness.
+The same repository location can be used by Codex and DSH.
 
 Explicit Codex invocation:
 
@@ -69,16 +73,14 @@ Explicit Codex invocation:
 $contract-build-prove
 ```
 
-DSH invocation depends on its active skill consumer/UI; once the skill is discovered, load/select `contract-build-prove` through the harness's skill capability.
-
 ## Core safety properties
 
-- substantial work is orchestrated, not performed monolithically by the coordinator when subagents exist;
+- substantial work is orchestrated through subagents, not performed monolithically by the coordinator;
 - acceptance criteria cannot be silently weakened after implementation begins;
 - builders cannot self-authorize acceptance;
 - final acceptance is tied to an exact candidate SHA/fingerprint;
-- any post-audit source edit invalidates the prior audit;
+- any post-verification source edit invalidates the prior verdict;
 - independent verification does not receive builder confidence or desired verdict;
 - user/newer work is protected across resume and integration;
 - push/merge/deploy/production mutation requires explicit authorization or repository policy;
-- missing independent proof is reported as a limitation, never simulated.
+- missing required subagent capability blocks CBP rather than silently degrading to single-agent execution.
