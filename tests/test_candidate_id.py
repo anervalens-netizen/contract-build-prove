@@ -31,6 +31,7 @@ class CandidateIdTests(unittest.TestCase):
         (self.root / "binary.bin").write_bytes(b"\x00base\xff")
         run(["git", "add", "."], self.root)
         run(["git", "commit", "-qm", "base"], self.root)
+        self.base_branch = run(["git", "branch", "--show-current"], self.root).stdout.strip()
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -100,9 +101,9 @@ class CandidateIdTests(unittest.TestCase):
         run(["git", "checkout", "-qb", "other"], self.root)
         (self.root / "tracked.txt").write_text("other\n")
         run(["git", "commit", "-qam", "other"], self.root)
-        run(["git", "checkout", "-q", "master"], self.root)
-        (self.root / "tracked.txt").write_text("master\n")
-        run(["git", "commit", "-qam", "master"], self.root)
+        run(["git", "checkout", "-q", self.base_branch], self.root)
+        (self.root / "tracked.txt").write_text("base-branch\n")
+        run(["git", "commit", "-qam", "base-branch"], self.root)
         self.assertNotEqual(0, run(["git", "merge", "other"], self.root, check=False).returncode)
         self.assert_unsupported("UNRESOLVED_CONFLICTS")
 
