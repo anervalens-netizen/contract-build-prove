@@ -53,7 +53,7 @@ Frozen at: [ISO-8601 or UNVERIFIED]
 
 | Task | Scope | Depends on | Owner | Attempts | State |
 |---|---|---|---|---:|---|
-| T1 | [atomic deliverable] | none | [owner] | 0 | READY |
+| T1 | [atomic deliverable] | none | [builder] | 0 | READY |
 
 ## Progress
 
@@ -71,16 +71,17 @@ Frozen at: [ISO-8601 or UNVERIFIED]
 
 - Candidate identity: UNVERIFIED
 - Candidate basis: [commit SHA OR HEAD + workspace fingerprint]
-- Frozen for audit: NO
+- Frozen for verification: NO
 - Drift check: UNVERIFIED
 - Integrated diff review: UNVERIFIED
 - Relevant regression gates: UNVERIFIED
 
-## Independent audit
+## Independent verification
 
-- Auditor: UNVERIFIED
+- Verifier: UNVERIFIED
+- Model/provider: UNVERIFIED
 - Verdict: UNVERIFIED
-- Candidate audited: UNVERIFIED
+- Candidate verified: UNVERIFIED
 - Criteria: UNVERIFIED
 - Largest gap: UNVERIFIED
 
