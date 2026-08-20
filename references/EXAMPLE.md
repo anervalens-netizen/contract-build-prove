@@ -25,15 +25,15 @@ Pre-fix reproduction confirms AC-1 currently fails: request returns `200`.
 
 Contract freezes before implementation.
 
-## Build
+## Builder subagent
 
-Worker changes validation in the profile request path and adds a regression test. Local targeted tests pass.
+The coordinator launches a scoped builder subagent. It changes validation in the profile request path, adds a regression test, runs targeted checks, and returns its handoff.
 
-Candidate commit: `bbb222`.
+The coordinator inspects/integrates the result and freezes candidate commit `bbb222`.
 
-## Independent audit #1
+## Independent verification #1
 
-Fresh auditor receives only objective, frozen contract, baseline, candidate `bbb222`, and verification targets.
+A fresh verifier receives only the objective, frozen contract, relevant baseline, candidate `bbb222`, and verification targets.
 
 ```text
 VERDICT: FAIL
@@ -44,17 +44,19 @@ UNVERIFIED: NONE
 LARGEST_GAP: preserve valid unicode display names
 ```
 
-No criteria are silently rewritten. Task returns to building.
+No criteria are silently rewritten. The affected task returns to building.
 
 ## Remediation
 
-Worker fixes the over-broad validation and reruns affected tests.
+The coordinator launches a builder to fix the demonstrated over-broad validation and rerun affected local checks.
 
-New candidate commit: `ccc333`.
+After integration, the new candidate commit is `ccc333`.
 
-The previous audit is now invalid because source changed.
+The previous verification is invalid because verified source changed.
 
-## Independent audit #2
+## Independent verification #2
+
+A fresh verifier checks `ccc333`.
 
 ```text
 VERDICT: PASS
@@ -75,7 +77,8 @@ Key properties demonstrated:
 
 - red → green bug reproduction;
 - frozen criteria;
-- builder and auditor separated;
-- audit tied to exact candidate;
-- source change invalidates earlier audit;
-- a failed audit repairs the demonstrated gap instead of redefining success.
+- coordinator delegates implementation;
+- builder and verifier are separate contexts;
+- verification is tied to an exact candidate;
+- source changes invalidate earlier verification;
+- a failed verification repairs the demonstrated gap instead of redefining success.
